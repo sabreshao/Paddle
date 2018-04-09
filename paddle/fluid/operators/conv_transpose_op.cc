@@ -86,6 +86,12 @@ framework::OpKernelType ConvTransposeOp::GetExpectedKernelType(
     use_cudnn &= dev_ctx.cudnn_handle() != nullptr;
   }
 #endif
+#ifdef PADDLE_WITH_HIP
+  if (platform::is_gpu_place(ctx.GetPlace())) {
+    auto& dev_ctx = ctx.template device_context<platform::CUDADeviceContext>();
+    use_cudnn &= dev_ctx.miopen_handle() != nullptr;
+  }
+#endif
   framework::LibraryType library_;
   if (use_cudnn) {
     library_ = framework::LibraryType::kCUDNN;
@@ -303,6 +309,12 @@ framework::OpKernelType ConvTransposeOpGrad::GetExpectedKernelType(
   if (platform::is_gpu_place(ctx.GetPlace())) {
     auto& dev_ctx = ctx.template device_context<platform::CUDADeviceContext>();
     use_cudnn &= dev_ctx.cudnn_handle() != nullptr;
+  }
+#endif
+#ifdef PADDLE_WITH_HIP
+  if (platform::is_gpu_place(ctx.GetPlace())) {
+    auto& dev_ctx = ctx.template device_context<platform::CUDADeviceContext>();
+    use_cudnn &= dev_ctx.miopen_handle() != nullptr;
   }
 #endif
   framework::LibraryType library_;

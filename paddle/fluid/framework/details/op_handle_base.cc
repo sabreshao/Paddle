@@ -54,7 +54,7 @@ void OpHandleBase::Run(bool use_cuda) {
     }
   }
 #elif defined(PADDLE_WITH_HIP)
-  if (events_.empty() && use_event) {
+  if (events_.empty() && use_cuda) {
     for (auto &p : dev_ctxes_) {
       int dev_id = boost::get<platform::CUDAPlace>(p.first).device;
       PADDLE_ENFORCE(hipSetDevice(dev_id));

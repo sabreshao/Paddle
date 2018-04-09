@@ -434,16 +434,16 @@ REGISTER_OP_CPU_KERNEL(
     ops::MatMulGradKernel<paddle::platform::CPUDeviceContext,
                           paddle::platform::float16>);
 
-#ifdef PADDLE_WITH_CUDA
+#if (defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP))
 REGISTER_OP_CUDA_KERNEL(
     matmul, ops::MatMulKernel<paddle::platform::CUDADeviceContext, float>,
-    ops::MatMulKernel<paddle::platform::CUDADeviceContext, double>,
-    ops::MatMulKernel<paddle::platform::CUDADeviceContext,
-                      paddle::platform::float16>);
+    ops::MatMulKernel<paddle::platform::CUDADeviceContext, double>);
+    //ops::MatMulKernel<paddle::platform::CUDADeviceContext,
+    //                  paddle::platform::float16>);
 REGISTER_OP_CUDA_KERNEL(
     matmul_grad,
     ops::MatMulGradKernel<paddle::platform::CUDADeviceContext, float>,
-    ops::MatMulGradKernel<paddle::platform::CUDADeviceContext, double>,
-    ops::MatMulGradKernel<paddle::platform::CUDADeviceContext,
-                          paddle::platform::float16>);
+    ops::MatMulGradKernel<paddle::platform::CUDADeviceContext, double>);
+    //ops::MatMulGradKernel<paddle::platform::CUDADeviceContext,
+    //                      paddle::platform::float16>);
 #endif

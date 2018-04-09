@@ -12,6 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
+#include "hip/hip_runtime.h"
 #include <algorithm>
 #include "paddle/fluid/operators/math/sequence_padding.h"
 
@@ -102,7 +103,7 @@ class PaddingLoDTensorFunctor<platform::CUDADeviceContext, T> {
     T* pad_data = pad_tensor->data<T>();
     const T* pad_value_data = pad_value.data<T>();
 
-    SequencePaddingKernel<T, kSeqToPad><<<grid, threads, 0, context.stream()>>>(
+    hipLaunchKernelGGL((SequencePaddingKernel<T, kSeqToPad>), dim3(grid), dim3(threads), 0, context.stream(),
         pad_data, seq_data, pad_value_data, pad_value.numel() == 1,
         seq_offsets.CUDAData(context.GetPlace()), seq_num, pad_seq_len,
         step_width, norm_by_times, layout);
@@ -153,7 +154,7 @@ class UnpaddingLoDTensorFunctor<platform::CUDADeviceContext, T> {
     const T* pad_data = pad_tensor.data<T>();
     T* seq_data = seq_tensor->data<T>();
 
-    SequencePaddingKernel<T, kPadToSeq><<<grid, threads, 0, context.stream()>>>(
+    hipLaunchKernelGGL((SequencePaddingKernel<T, kPadToSeq>), dim3(grid), dim3(threads), 0, context.stream(),
         seq_data, pad_data, nullptr, false,
         seq_offsets.CUDAData(context.GetPlace()), seq_num, pad_seq_len,
         step_width, norm_by_times, layout);
