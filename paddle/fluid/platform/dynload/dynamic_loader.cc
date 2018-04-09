@@ -39,6 +39,10 @@ DEFINE_string(nccl_dir, "",
               "Specify path for loading nccl library, such as libcublas, "
               "libcurand. For instance, /usr/local/cuda/lib64. If default, "
               "dlopen will search cuda from LD_LIBRARY_PATH");
+DEFINE_string(rccl_dir, "",
+              "Specify path for loading nccl library, such as libcublas, "
+              "libcurand. For instance, /usr/local/cuda/lib64. If default, "
+              "dlopen will search cuda from LD_LIBRARY_PATH");
 
 DEFINE_string(cupti_dir, "", "Specify path for loading cupti.so.");
 
@@ -166,7 +170,7 @@ void* GetCublasDsoHandle() {
 #if defined(__APPLE__) || defined(__OSX__)
   return GetDsoHandleFromSearchPath(FLAGS_cuda_dir, "libcublas.dylib");
 #else
-  return GetDsoHandleFromSearchPath(FLAGS_cuda_dir, "libcublas.so");
+  return GetDsoHandleFromSearchPath(FLAGS_cuda_dir, "libhipblas.so");
 #endif
 }
 
@@ -174,7 +178,7 @@ void* GetCUDNNDsoHandle() {
 #if defined(__APPLE__) || defined(__OSX__)
   return GetDsoHandleFromSearchPath(FLAGS_cudnn_dir, "libcudnn.dylib", false);
 #else
-  return GetDsoHandleFromSearchPath(FLAGS_cudnn_dir, "libcudnn.so", false);
+  return GetDsoHandleFromSearchPath(FLAGS_cudnn_dir, "libMIOpen.so", false);
 #endif
 }
 
@@ -194,7 +198,7 @@ void* GetCurandDsoHandle() {
 #if defined(__APPLE__) || defined(__OSX__)
   return GetDsoHandleFromSearchPath(FLAGS_cuda_dir, "libcurand.dylib");
 #else
-  return GetDsoHandleFromSearchPath(FLAGS_cuda_dir, "libcurand.so");
+  return GetDsoHandleFromSearchPath(FLAGS_cuda_dir, "libhiprand.so");
 #endif
 }
 
@@ -212,6 +216,10 @@ void* GetNCCLDsoHandle() {
 #else
   return GetDsoHandleFromSearchPath(FLAGS_nccl_dir, "libnccl.so");
 #endif
+}
+
+void* GetRCCLDsoHandle() {
+  return GetDsoHandleFromSearchPath(FLAGS_rccl_dir, "librccl.so");
 }
 
 void* GetTensorRtDsoHandle() {
