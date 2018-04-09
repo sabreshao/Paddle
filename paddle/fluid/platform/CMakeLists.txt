@@ -26,6 +26,7 @@ cc_library(cpu_info SRCS cpu_info.cc DEPS ${CPU_INFO_DEPS})
 cc_test(cpu_info_test SRCS cpu_info_test.cc DEPS cpu_info)
 
 nv_library(gpu_info SRCS gpu_info.cc DEPS gflags glog enforce)
+hip_library(gpu_info SRCS gpu_info_hip.cc DEPS gflags glog enforce)
 
 cc_library(place SRCS place.cc DEPS enforce boost)
 cc_test(place_test SRCS place_test.cc DEPS place glog gflags)
@@ -37,6 +38,8 @@ cc_test(cpu_helper_test SRCS cpu_helper_test.cc DEPS cpu_helper)
 
 IF(WITH_GPU)
     set(GPU_CTX_DEPS dynload_cuda dynamic_loader)
+ELSEIF(WITH_AMD_GPU)
+    set(GPU_CTX_DEPS dynload_hip dynamic_loader)
 ELSE()
     set(GPU_CTX_DEPS)
 ENDIF()
@@ -62,9 +65,15 @@ cc_library(device_tracer SRCS device_tracer.cc DEPS boost profiler_proto framewo
 cc_library(profiler SRCS profiler.cc DEPS device_context device_tracer)
 cc_test(profiler_test SRCS profiler_test.cc DEPS profiler)
 
-nv_test(float16_gpu_test SRCS float16_test.cu DEPS lod_tensor)
+if(WITH_GPU)
+  nv_test(float16_gpu_test SRCS float16_test.cu DEPS lod_tensor)
+elseif(WITH_AMD_GPU)
+  hip_test(float16_gpu_test SRCS float16_test.cu DEPS lod_tensor)
+endif()
 cc_test(float16_test SRCS float16_test.cc DEPS lod_tensor)
 
 IF(WITH_GPU)
   nv_test(cuda_helper_test SRCS cuda_helper_test.cu)
+ELSEIF(WITH_AMD_GPU)
+  hip_test(cuda_helper_test SRCS cuda_helper_test.cu)
 ENDIF()
