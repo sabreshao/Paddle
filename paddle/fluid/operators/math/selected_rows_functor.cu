@@ -12,6 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
+#include "hip/hip_runtime.h"
 #include <set>
 #include <vector>
 
@@ -123,10 +124,9 @@ struct SelectedRowsAddTensor<platform::CUDADeviceContext, T> {
     const int block_size = 256;
     dim3 threads(block_size, 1);
     dim3 grid(1, in1_rows.size());
-    SelectedRowsAddTensorKernel<
-        T, block_size><<<grid, threads, 0, context.stream()>>>(
-        in1_data, in1_rows.CUDAData(context.GetPlace()), out_data,
-        in1_row_numel);
+    hipLaunchKernelGGL((SelectedRowsAddTensorKernel<T, block_size>),
+        dim3(grid), dim3(threads), 0,
+            context.stream(), in1_data, in1_rows.data(), out_data, in1_row_numel);
 
     auto out_eigen = framework::EigenVector<T>::Flatten(*output);
     auto in2_eigen = framework::EigenVector<T>::Flatten(input2);
@@ -216,8 +216,8 @@ struct SelectedRowsAddToTensor<platform::CUDADeviceContext, T> {
     const int block_size = 256;
     dim3 threads(block_size, 1);
     dim3 grid(1, in1_rows.size());
-    SelectedRowsAddToTensorKernel<
-        T, block_size><<<grid, threads, 0, context.stream()>>>(
+    hipLaunchKernelGGL((SelectedRowsAddToTensorKernel<T, block_size>),
+        dim3(grid), dim3(threads), 0, context.stream(),
         in1_data, in1_rows.CUDAData(context.GetPlace()), in2_data,
         in1_row_numel);
   }
@@ -291,7 +291,9 @@ struct MergeAdd<platform::CUDADeviceContext, T> {
     dim3 threads(block_size, 1);
     dim3 grid1(input_rows.size(), 1);
 
-    MergeAddKernel<T, 256><<<grid1, threads, 0, context.stream()>>>(
+    hipLaunchKernelGGL((MergeAddKernel<T, 256>),
+                  dim3(grid1), dim3(threads), 0,
+                  context.stream(),
         input_data, input_rows.CUDAData(context.GetPlace()), out_data,
         out.mutable_rows()->CUDAMutableData(context.GetPlace()),
         out.rows().size(), input_width);
@@ -377,8 +379,8 @@ struct UpdateToTensor<platform::CUDADeviceContext, T> {
 
     dim3 threads(platform::PADDLE_CUDA_NUM_THREADS, 1);
     dim3 grid(1, in1_rows.size());
-    UpdateToTensorKernel<T, platform::PADDLE_CUDA_NUM_THREADS><<<
-        grid, threads, 0, context.stream()>>>(in1_data, in1_rows.cuda_data(),
+    hipLaunchKernelGGL((UpdateToTensorKernel<T, platform::PADDLE_CUDA_NUM_THREADS>),
+        dim3(grid), dim3(threads), 0, context.stream(), in1_data, in1_rows.cuda_data(),
                                               op, in2_data, in1_row_numel);
   }
 };

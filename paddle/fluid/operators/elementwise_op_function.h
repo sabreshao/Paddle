@@ -15,6 +15,7 @@ limitations under the License. */
 #pragma once
 
 #include <glog/logging.h>
+#include "hip/hip_runtime.h"
 #include <algorithm>
 #include <iterator>
 #include <vector>
@@ -23,12 +24,11 @@ limitations under the License. */
 #include "paddle/fluid/framework/operator.h"
 #include "paddle/fluid/platform/transform.h"
 
-#ifdef __NVCC__
-#include <cuda.h>
+#ifdef __HCC__
 #include <thrust/iterator/iterator_adaptor.h>
 #include "paddle/fluid/platform/cuda_device_function.h"
 #include "paddle/fluid/platform/cuda_primitives.h"
-constexpr int ELEMWISE_MAX_BLOCK_DIM = 1024;
+constexpr int ELEMWISE_MAX_BLOCK_DIM = 256;
 #endif
 
 #include "paddle/fluid/operators/math/math_function.h"
@@ -169,7 +169,7 @@ class MidWiseTransformIterator<T, platform::CPUDeviceContext>
   int64_t post_;
 };
 
-#ifdef __NVCC__
+#ifdef __HCC__
 template <typename T>
 class RowwiseTransformIterator<T, platform::CUDADeviceContext>
     : public thrust::iterator_adaptor<
@@ -357,7 +357,7 @@ static void ElemwiseGradBroadcast1CPU(const T *x, const T *y, const T *out,
   }
 }
 
-#ifdef __NVCC__
+#ifdef __HIPCC__
 template <typename T, typename DX_OP, typename DY_OP>
 static __global__ void ElemwiseGradBroadcast1CUDAKernel(
     const T *x, const T *y, const T *out, const T *dout, int h, int w,
@@ -388,13 +388,13 @@ static __global__ void ElemwiseGradBroadcast1CUDAKernel(
 }
 
 template <typename T, typename DX_OP, typename DY_OP>
-static void ElemwiseGradBroadcast1CUDA(cudaStream_t stream, const T *x,
+static void ElemwiseGradBroadcast1CUDA(hipStream_t stream, const T *x,
                                        const T *y, const T *out, const T *dout,
                                        int h, int w, DX_OP dx_op, DY_OP dy_op,
                                        T *dx, T *dy) {
   int block_size = std::min(ELEMWISE_MAX_BLOCK_DIM, h);
   int gird_size = w;
-  ElemwiseGradBroadcast1CUDAKernel<<<gird_size, block_size, 0, stream>>>(
+  hipLaunchKernelGGL((ElemwiseGradBroadcast1CUDAKernel), dim3(gird_size), dim3(block_size), 0, stream, 
       x, y, out, dout, h, w, dx_op, dy_op, dx, dy);
 }
 
@@ -425,7 +425,7 @@ static void ElemwiseGradBroadcast2CPU(const T *x, const T *y, const T *out,
   }
 }
 
-#ifdef __NVCC__
+#ifdef __HIPCC__
 template <typename T, typename DX_OP, typename DY_OP>
 static __global__ void ElemwiseGradBroadcast2CUDAKernel(
     const T *x, const T *y, const T *out, const T *dout, int pre, int n,
@@ -465,13 +465,13 @@ static __global__ void ElemwiseGradBroadcast2CUDAKernel(
 }
 
 template <typename T, typename DX_OP, typename DY_OP>
-static void ElemwiseGradBroadcast2CUDA(cudaStream_t stream, const T *x,
+static void ElemwiseGradBroadcast2CUDA(hipStream_t stream, const T *x,
                                        const T *y, const T *out, const T *dout,
                                        int pre, int n, int post, DX_OP dx_op,
                                        DY_OP dy_op, T *dx, T *dy) {
   int block_size = std::min(ELEMWISE_MAX_BLOCK_DIM, pre * post);
   int gird_size = n;
-  ElemwiseGradBroadcast2CUDAKernel<<<gird_size, block_size, 0, stream>>>(
+  hipLaunchKernelGGL((ElemwiseGradBroadcast2CUDAKernel), dim3(gird_size), dim3(block_size), 0, stream, 
       x, y, out, dout, pre, n, post, dx_op, dy_op, dx, dy);
 }
 
@@ -515,7 +515,7 @@ void ElemwiseGradComputeWithBroadcast(
     int h = pre;
     int w = n;
     if (platform::is_gpu_place(ctx.GetPlace())) {
-#ifdef __NVCC__
+#ifdef __HIPCC__
       ElemwiseGradBroadcast1CUDA(
           ctx.template device_context<DeviceContext>().stream(), x.data<T>(),
           y.data<T>(), out.data<T>(), dout.data<T>(), h, w, dx_op, dy_op,
@@ -530,7 +530,7 @@ void ElemwiseGradComputeWithBroadcast(
     }
   } else {
     if (platform::is_gpu_place(ctx.GetPlace())) {
-#ifdef __NVCC__
+#ifdef __HIPCC__
       ElemwiseGradBroadcast2CUDA(
           ctx.template device_context<DeviceContext>().stream(), x.data<T>(),
           y.data<T>(), out.data<T>(), dout.data<T>(), pre, n, post, dx_op,

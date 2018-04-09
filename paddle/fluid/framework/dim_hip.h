@@ -184,7 +184,7 @@ int64_t indexer(const Dim<D>& dim, int idx) POSTHOSTDEVICE {
 template <>
 int64_t indexer<0>(const Dim<0>& dim, int idx) POSTHOSTDEVICE {
 #ifndef __HIP_DEVICE_COMPILE__
-  throw std::invalid_argument("Invalid index");
+  return 0;//throw std::invalid_argument("Invalid index");
 #else
   PADDLE_ASSERT(false);
 #if CUDA_VERSION < 8000
