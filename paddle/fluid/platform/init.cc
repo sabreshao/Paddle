@@ -76,12 +76,31 @@ void InitP2P(std::vector<int> devices) {
     }
   });
 #endif
+#ifdef PADDLE_WITH_HIP
+  std::call_once(p2p_init_flag, [&]() {
+    int count = devices.size();
+    for (int i = 0; i < count; ++i) {
+      for (int j = 0; j < count; ++j) {
+        if (i == j) continue;
+        int can_acess = -1;
+        PADDLE_ENFORCE(hipDeviceCanAccessPeer(&can_acess, i, j),
+                       "Failed to test P2P access.");
+        if (can_acess != 1) {
+          LOG(WARNING) << "Cannot enable P2P access from " << i << " to " << j;
+        } else {
+          hipSetDevice(i);
+          hipDeviceEnablePeerAccess(j, 0);
+        }
+      }
+    }
+  });
+#endif
 }
 
 void InitDevices(bool init_p2p) {
   /*Init all available devices by default */
   std::vector<int> devices;
-#ifdef PADDLE_WITH_CUDA
+#if (defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP))
   try {
     // use user specified GPUs in single-node multi-process mode.
     devices = platform::GetSelectedDevices();
