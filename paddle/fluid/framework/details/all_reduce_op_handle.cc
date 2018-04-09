@@ -74,7 +74,7 @@ void AllReduceOpHandle::RunImpl() {
     }
 
     if (platform::is_gpu_place(lod_tensors[0]->place())) {
-#ifdef PADDLE_WITH_CUDA
+#if (defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP))
       PADDLE_ENFORCE(nccl_ctxs_, "nccl_ctxs should not be nullptr.");
       int dtype = -1;
       size_t numel = 0;
@@ -96,11 +96,19 @@ void AllReduceOpHandle::RunImpl() {
         auto &nccl_ctx = nccl_ctxs_->at(dev_id);
         auto stream = nccl_ctx.stream();
         auto comm = nccl_ctx.comm_;
+#ifdef PADDLE_WITH_HIP
+        all_reduce_calls.emplace_back([=] {
+          PADDLE_ENFORCE(platform::dynload::rcclAllReduce(
+              buffer, buffer, numel, static_cast<rcclDataType_t>(dtype),
+              rcclSum, comm, stream));
+        });
+#else
         all_reduce_calls.emplace_back([=] {
           PADDLE_ENFORCE(platform::dynload::ncclAllReduce(
               buffer, buffer, numel, static_cast<ncclDataType_t>(dtype),
               ncclSum, comm, stream));
         });
+#endif
       }
       this->RunAndRecordEvent([&] {
         platform::NCCLGroupGuard guard;

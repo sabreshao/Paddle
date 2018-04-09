@@ -125,7 +125,7 @@ void ReduceOpHandle::RunImpl() {
         }
       });
     } else if (paddle::platform::is_gpu_place(lod_tensors[0]->place())) {
-#ifdef PADDLE_WITH_CUDA
+#if (defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP))
       auto pre_in = pre_in_var->Get<framework::LoDTensor>();
       VariableVisitor::ShareDimsAndLoD(*pre_in_var, out_var);
       VariableVisitor::GetMutableTensor(out_var).mutable_data(
@@ -143,19 +143,27 @@ void ReduceOpHandle::RunImpl() {
 
         void *buffer = const_cast<void *>(lod_tensor.data<void>());
         void *recvbuffer = nullptr;
+#ifdef PADDLE_WITH_CUDA
         if (root_id == dev_id) {
+#endif
           recvbuffer =
               out_var->GetMutable<framework::LoDTensor>()->mutable_data(
                   out_var_handle->place_);
+#ifdef PADDLE_WITH_CUDA
         }
+#endif
 
         int type = platform::ToNCCLDataType(lod_tensor.type());
         size_t numel = static_cast<size_t>(lod_tensor.numel());
         all_reduce_calls.emplace_back(
             [buffer, recvbuffer, type, numel, root_id, &nccl_ctx] {
-              PADDLE_ENFORCE(platform::dynload::ncclReduce(
-                  buffer, recvbuffer, numel, static_cast<ncclDataType_t>(type),
-                  ncclSum, root_id, nccl_ctx.comm_, nccl_ctx.stream()));
+#ifdef PADDLE_WITH_HIP
+              PADDLE_THROW("Reduce is not supported.");
+#else
+	      PADDLE_ENFORCE(platform::dynload::ncclReduce(
+		  buffer, recvbuffer, numel, static_cast<ncclDataType_t>(type),
+		  ncclSum, root_id, nccl_ctx.comm_, nccl_ctx.stream()));
+#endif
             });
       }
 
