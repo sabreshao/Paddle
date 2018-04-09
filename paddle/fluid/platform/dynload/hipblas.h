@@ -1,25 +1,24 @@
 /* Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserved.
 
-   Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
 
-   http://www.apache.org/licenses/LICENSE-2.0
+    http://www.apache.org/licenses/LICENSE-2.0
 
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License. */
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License. */
 
 #pragma once
 
 #include <hipblas.h>
 #include <dlfcn.h>
-#include <mutex>  // NOLINT
+#include <mutex>
 #include <type_traits>
 #include "paddle/fluid/platform/dynload/dynamic_loader.h"
-#include "paddle/fluid/platform/port.h"
 
 namespace paddle {
 namespace platform {
@@ -44,7 +43,7 @@ extern void *cublas_dso_handle;
       std::call_once(cublas_dso_flag, []() {                                 \
         cublas_dso_handle = paddle::platform::dynload::GetCublasDsoHandle(); \
       });                                                                    \
-      static void *p_##__name = dlsym(cublas_dso_handle, #__name);           \
+      void *p_##__name = dlsym(cublas_dso_handle, #__name);                  \
       return reinterpret_cast<FUNC_TYPE>(p_##__name)(args...);               \
     }                                                                        \
   };                                                                         \
@@ -54,7 +53,7 @@ extern void *cublas_dso_handle;
   struct DynLoad__##__name {                         \
     template <typename... Args>                      \
     inline hipblasStatus_t operator()(Args... args) { \
-      return ::__name(args...);                      \
+      return __name(args...);                        \
     }                                                \
   };                                                 \
   extern DynLoad__##__name __name
@@ -70,6 +69,7 @@ extern void *cublas_dso_handle;
   __macro(hipblasDgemv);                \
   __macro(hipblasSgemm);                \
   __macro(hipblasDgemm);                \
+  __macro(hipblasHgemm);                \
   __macro(hipblasSgeam);                \
   __macro(hipblasDgeam);                \
   __macro(hipblasCreate);               \
@@ -79,37 +79,10 @@ extern void *cublas_dso_handle;
   __macro(hipblasGetPointerMode);       \
   __macro(hipblasSgemmBatched);            \
   __macro(hipblasDgemmBatched);            \
-  __macro(hipblasCgemmBatched);            \
-  __macro(hipblasZgemmBatched);            \
   __macro(hipblasSgemmStridedBatched);     \
-  __macro(hipblasDgemmStridedBatched);     \
-  __macro(hipblasCgemmStridedBatched);     \
-  __macro(hipblasZgemmStridedBatched);     \
-  __macro(hipblasDgetrfBatched);           \
-  __macro(hipblasDgetriBatched)
+  __macro(hipblasDgemmStridedBatched);
 
-
-CUBLAS_BLAS_ROUTINE_EACH(DECLARE_DYNAMIC_LOAD_CUBLAS_WRAP)
-
-// APIs available after CUDA 8.0
-#if CUDA_VERSION >= 8000
-#define CUBLAS_BLAS_ROUTINE_EACH_R2(__macro) \
-  __macro(cublasGemmEx);                     \
-  __macro(cublasSgemmStridedBatched);        \
-  __macro(cublasDgemmStridedBatched);        \
-  __macro(cublasCgemmStridedBatched);        \
-  __macro(cublasZgemmStridedBatched);        \
-  __macro(cublasHgemmStridedBatched);
-
-CUBLAS_BLAS_ROUTINE_EACH_R2(DECLARE_DYNAMIC_LOAD_CUBLAS_WRAP)
-#endif
-
-// APIs available after CUDA 9.0
-#if CUDA_VERSION >= 9000
-#define CUBLAS_BLAS_ROUTINE_EACH_R3(__macro) __macro(cublasSetMathMode);
-
-CUBLAS_BLAS_ROUTINE_EACH_R3(DECLARE_DYNAMIC_LOAD_CUBLAS_WRAP)
-#endif
+CUBLAS_BLAS_ROUTINE_EACH(DECLARE_DYNAMIC_LOAD_CUBLAS_WRAP);
 
 #undef DECLARE_DYNAMIC_LOAD_CUBLAS_WRAP
 }  // namespace dynload

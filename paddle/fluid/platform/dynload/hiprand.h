@@ -11,14 +11,13 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
+
 #pragma once
 
 #include <hiprand.h>
 #include <dlfcn.h>
-
-#include <mutex>  // NOLINT
-#include "paddle/fluid/platform/port.h"
-
+#include <mutex>
+#include <type_traits>
 #include "paddle/fluid/platform/dynload/dynamic_loader.h"
 
 namespace paddle {
@@ -29,14 +28,14 @@ extern void *curand_dso_handle;
 #ifdef PADDLE_USE_DSO
 #define DECLARE_DYNAMIC_LOAD_CURAND_WRAP(__name)                             \
   struct DynLoad__##__name {                                                 \
+    using FUNC_TYPE = decltype(&::__name);                                   \
     template <typename... Args>                                              \
-    hiprandStatus_t operator()(Args... args) {                                \
-      using curandFunc = decltype(&::__name);                                \
+    inline hiprandStatus_t operator()(Args... args) {                        \
       std::call_once(curand_dso_flag, []() {                                 \
         curand_dso_handle = paddle::platform::dynload::GetCurandDsoHandle(); \
       });                                                                    \
-      static void *p_##__name = dlsym(curand_dso_handle, #__name);           \
-      return reinterpret_cast<curandFunc>(p_##__name)(args...);              \
+      void *p_##__name = dlsym(curand_dso_handle, #__name);                  \
+      return reinterpret_cast<FUNC_TYPE>(p_##__name)(args...);               \
     }                                                                        \
   };                                                                         \
   extern DynLoad__##__name __name
@@ -45,7 +44,7 @@ extern void *curand_dso_handle;
   struct DynLoad__##__name {                     \
     template <typename... Args>                  \
     hiprandStatus_t operator()(Args... args) {    \
-      return ::__name(args...);                  \
+      return __name(args...);                    \
     }                                            \
   };                                             \
   extern DynLoad__##__name __name
@@ -62,6 +61,7 @@ extern void *curand_dso_handle;
 
 CURAND_RAND_ROUTINE_EACH(DECLARE_DYNAMIC_LOAD_CURAND_WRAP);
 
+#undef DECLARE_DYNAMIC_LOAD_CURAND_WRAP
 }  // namespace dynload
 }  // namespace platform
 }  // namespace paddle
