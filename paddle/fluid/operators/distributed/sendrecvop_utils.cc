@@ -15,6 +15,11 @@ limitations under the License. */
 #ifdef PADDLE_WITH_CUDA
 #include <nccl.h>
 #endif
+
+#ifdef PADDLE_WITH_HIP
+#include <rccl.h>
+#endif
+
 #include <sys/time.h>
 #include <thread>  // NOLINT
 
@@ -57,7 +62,7 @@ void GetTensorPayload(framework::Variable* var,
     }
   }
   if (platform::is_gpu_place(ctx.GetPlace())) {
-#ifdef PADDLE_WITH_CUDA
+#if (defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP))
     PADDLE_ENFORCE(platform::is_gpu_place(tensor.place()));
     // platform::CUDAPinnedPlace cuda_pinned;
     auto& gpu_dev_ctx = static_cast<const platform::CUDADeviceContext&>(ctx);
@@ -93,7 +98,7 @@ void GetSelectedRowsPayload(framework::Variable* var,
 
   auto* tensor = slr->mutable_value();
   if (platform::is_gpu_place(ctx.GetPlace())) {
-#ifdef PADDLE_WITH_CUDA
+#if (defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP))
     auto& gpu_dev_ctx = static_cast<const platform::CUDADeviceContext&>(ctx);
     auto copy_size = tensor->numel() * framework::SizeOfType(tensor->type());
     *payload = GetVarPayLoad(request->varname(), copy_size);

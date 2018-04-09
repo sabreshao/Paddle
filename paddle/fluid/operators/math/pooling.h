@@ -43,6 +43,7 @@ class MaxPool {
   DEVICE inline T initial() { return static_cast<T>(-FLT_MAX); }
   DEVICE inline void compute(const T& x, T* y) { *y = *y > x ? *y : x; }
   DEVICE inline void finalize(const T& pool_field, T* y) {}
+  DEVICE int reserved;
 };
 
 template <class T>
@@ -51,6 +52,7 @@ class AvgPool {
   DEVICE inline T initial() { return static_cast<T>(0); }
   DEVICE inline void compute(const T& x, T* y) { *y += x; }
   DEVICE inline void finalize(const T& pool_field, T* y) { *y /= pool_field; }
+  DEVICE int reserved;
 };
 
 template <class T>
@@ -60,6 +62,7 @@ class MaxPoolGrad {
                              T* dx) {
     *dx += dy * (x == y);
   }
+  DEVICE int reserved;
 };
 
 template <class T>
@@ -69,6 +72,7 @@ class AvgPoolGrad {
                              T* dx) {
     *dx += (scale * dy);
   }
+  DEVICE int reserved;
 };
 
 /*
