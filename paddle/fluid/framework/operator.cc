@@ -147,7 +147,7 @@ void OperatorBase::Run(const Scope& scope, const platform::Place& place) {
       VLOG(4) << place << " " << DebugStringEx(&scope);
     }
     if (platform::is_gpu_place(place)) {
-#ifndef PADDLE_WITH_CUDA
+#if !(defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP))
       PADDLE_THROW("Cannot run operator on place %s", place);
 #else
       auto dev_id = boost::get<platform::CUDAPlace>(place).device;

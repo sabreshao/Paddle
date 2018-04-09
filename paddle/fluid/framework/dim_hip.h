@@ -21,6 +21,17 @@
 #include "paddle/fluid/platform/assert.h"
 #include "paddle/fluid/platform/hostdevice.h"
 
+#ifdef __HIPCC__
+#define POSTHOSTDEVICE restrict(amp, cpu)
+#define POSTDEVICE restrict(amp)
+#define POSTHOST restrict(cpu)
+#else
+#define POSTHOSTDEVICE
+#define POSTDEVICE
+#define POSTHOST
+#endif
+
+
 namespace paddle {
 namespace framework {
 
@@ -30,41 +41,33 @@ struct Dim {
   static constexpr int dimensions = i;
 
   template <typename... Args>
-  HOSTDEVICE Dim(int64_t _head, Args... _tail) : head(_head), tail(_tail...) {
+  Dim(int64_t _head, Args... _tail) POSTHOSTDEVICE : head(_head), tail(_tail...) {
     static_assert(sizeof...(_tail) == i - 1,
                   "Dim initialized with the wrong number of parameters");
   }
 
-  HOSTDEVICE
-  Dim(int64_t _head, const Dim<i - 1>& _tail) : head(_head), tail(_tail) {}
+  Dim(int64_t _head, const Dim<i - 1>& _tail) POSTHOSTDEVICE : head(_head), tail(_tail) {}
 
-  HOSTDEVICE
-  Dim() : head(0), tail() {}
+  Dim() POSTHOSTDEVICE : head(0), tail() {}
 
   /** Construct a Dim from a linear index and size.  Uses Fortran order
    * indexing. */
-  HOSTDEVICE
-  Dim(int64_t idx, const Dim<i>& size)
+  Dim(int64_t idx, const Dim<i>& size) POSTHOSTDEVICE
       : head(idx % size.head), tail(idx / size.head, size.tail) {}
 
   /** Construct a Dim with each dimension set to the given index */
-  HOSTDEVICE
-  Dim(int64_t idx) : head(idx), tail(idx) {}
+  Dim(int64_t idx) POSTHOSTDEVICE : head(idx), tail(idx) {}
 
-  HOSTDEVICE
-  bool operator==(const Dim<i>& o) const {
+  bool operator==(const Dim<i>& o) const POSTHOSTDEVICE {
     return (head == o.head) && (tail == o.tail);
   }
 
-  HOSTDEVICE
-  bool operator!=(const Dim<i>& o) const { return !(*this == o); }
+  bool operator!=(const Dim<i>& o) const POSTHOSTDEVICE { return !(*this == o); }
 
-  HOSTDEVICE
-  int64_t& operator[](int idx);
-  HOSTDEVICE
-  int64_t operator[](int idx) const;
+  int64_t& operator[](int idx) POSTHOSTDEVICE;
+  int64_t operator[](int idx) const POSTHOSTDEVICE;
 
-  HOST std::string to_string() const;
+  std::string to_string() const POSTHOST;
 
   int64_t head;
   Dim<i - 1> tail;
@@ -75,33 +78,27 @@ template <>
 struct Dim<0> {
   static constexpr int dimensions = 0;
 
-  HOSTDEVICE
-  Dim(int64_t _head) {}
+  Dim(int64_t _head) POSTHOSTDEVICE {}
 
-  HOSTDEVICE
-  Dim() {}
+  Dim() POSTHOSTDEVICE {}
 
-  HOSTDEVICE
-  Dim(int idx, const Dim<0>& size) {
-#if !defined(__CUDA_ARCH__) && !defined(__HIP_DEVICE_COMPILE__)
+  Dim(int idx, const Dim<0>& size) POSTHOSTDEVICE {
+#ifndef __HIP_DEVICE_COMPILE__
     if (idx > 0) {
-      throw std::invalid_argument("Index out of range.");
+      ;//throw std::invalid_argument("Index out of range.");
     }
 #else
     PADDLE_ASSERT(idx == 0);
 #endif
   }
 
-  HOSTDEVICE
-  bool operator==(const Dim<0>& o) const { return true; }
+  bool operator==(const Dim<0>& o) const POSTHOSTDEVICE { return true; }
 
-  HOSTDEVICE
-  bool operator!=(const Dim<0>& o) const { return false; }
+  bool operator!=(const Dim<0>& o) const POSTHOSTDEVICE { return false; }
 
-  HOSTDEVICE
-  int64_t& operator[](int idx);
-  HOSTDEVICE
-  int64_t operator[](int idx) const;
+  int64_t& operator[](int idx) POSTHOSTDEVICE;
+  int64_t operator[](int idx) const POSTHOSTDEVICE;
+
 };
 
 namespace {
@@ -111,12 +108,12 @@ template <int i>
 struct DimGetter {
   // Return a copy if Dim is const
   template <typename D>
-  HOSTDEVICE static int64_t impl(const D& d) {
+  static int64_t impl(const D& d) POSTHOSTDEVICE {
     return DimGetter<i - 1>::impl(d.tail);
   }
   // Return a reference if Dim is mutable
   template <typename D>
-  HOSTDEVICE static int64_t& impl(D& d) {
+  static int64_t& impl(D& d) POSTHOSTDEVICE {
     return DimGetter<i - 1>::impl(d.tail);
   }
 };
@@ -126,21 +123,21 @@ template <>
 struct DimGetter<0> {
   // Return a copy if Dim is const
   template <typename D>
-  HOSTDEVICE static int64_t impl(const D& d) {
+  static int64_t impl(const D& d) POSTHOSTDEVICE {
     return d.head;
   }
   // Return a reference if Dim is mutable
   template <typename D>
-  HOSTDEVICE static int64_t& impl(D& d) {
+  static int64_t& impl(D& d) POSTHOSTDEVICE {
     return d.head;
   }
 };
 
 template <int D>
-HOSTDEVICE int64_t& indexer(Dim<D>& dim, int idx) {
-#if !defined(__CUDA_ARCH__) && !defined(__HIP_DEVICE_COMPILE__)
+int64_t& indexer(Dim<D>& dim, int idx) POSTHOSTDEVICE {
+#ifndef __HIP_DEVICE_COMPILE__
   if (idx < 0) {
-    throw std::invalid_argument("Tried to access a negative dimension");
+    ;//throw std::invalid_argument("Tried to access a negative dimension");
   }
 #else
   PADDLE_ASSERT(idx >= 0);
@@ -152,9 +149,10 @@ HOSTDEVICE int64_t& indexer(Dim<D>& dim, int idx) {
 }
 
 template <>
-HOSTDEVICE int64_t& indexer<0>(Dim<0>& dim, int idx) {
-#if !defined(__CUDA_ARCH__) && !defined(__HIP_DEVICE_COMPILE__)
-  throw std::invalid_argument("Invalid index");
+int64_t& indexer<0>(Dim<0>& dim, int idx) POSTHOSTDEVICE {
+#ifndef __HIP_DEVICE_COMPILE__
+  static int64_t head = 0;
+  return head;//throw std::invalid_argument("Invalid index");
 #else
   PADDLE_ASSERT(false);
 #if CUDA_VERSION < 8000
@@ -169,10 +167,10 @@ HOSTDEVICE int64_t& indexer<0>(Dim<0>& dim, int idx) {
 }
 
 template <int D>
-HOSTDEVICE int64_t indexer(const Dim<D>& dim, int idx) {
-#if !defined(__CUDA_ARCH__) && !defined(__HIP_DEVICE_COMPILE__)
+int64_t indexer(const Dim<D>& dim, int idx) POSTHOSTDEVICE {
+#ifndef __HIP_DEVICE_COMPILE__
   if (idx < 0) {
-    throw std::invalid_argument("Tried to access a negative dimension");
+    ;//throw std::invalid_argument("Tried to access a negative dimension");
   }
 #else
   PADDLE_ASSERT(idx >= 0);
@@ -184,8 +182,8 @@ HOSTDEVICE int64_t indexer(const Dim<D>& dim, int idx) {
 }
 
 template <>
-HOSTDEVICE int64_t indexer<0>(const Dim<0>& dim, int idx) {
-#if !defined(__CUDA_ARCH__) && !defined(__HIP_DEVICE_COMPILE__)
+int64_t indexer<0>(const Dim<0>& dim, int idx) POSTHOSTDEVICE {
+#ifndef __HIP_DEVICE_COMPILE__
   throw std::invalid_argument("Invalid index");
 #else
   PADDLE_ASSERT(false);
@@ -203,82 +201,82 @@ HOSTDEVICE int64_t indexer<0>(const Dim<0>& dim, int idx) {
 }  // namespace
 // Static access to constant Dim
 template <int i, int l>
-HOSTDEVICE int64_t get(const Dim<l>& d) {
+int64_t get(const Dim<l>& d) POSTHOSTDEVICE {
   return DimGetter<i>::impl(d);
 }
 
 // Static access to mutable Dim
 template <int i, int l>
-HOSTDEVICE int64_t& get(Dim<l>& d) {
+int64_t& get(Dim<l>& d) POSTHOSTDEVICE {
   return DimGetter<i>::impl(d);
 }
 
 // Dynamic access to constant Dim
 template <int l>
-HOSTDEVICE int64_t Dim<l>::operator[](int i) const {
+int64_t Dim<l>::operator[](int i) const POSTHOSTDEVICE {
   return indexer(*this, i);
 }
 
 // Dynamic access to mutable Dim
 template <int l>
-HOSTDEVICE int64_t& Dim<l>::operator[](int i) {
+int64_t& Dim<l>::operator[](int i) POSTHOSTDEVICE {
   return indexer(*this, i);
 }
 
 // Dynamic access to constant Dim
-inline HOSTDEVICE int64_t Dim<0>::operator[](int i) const {
+inline int64_t Dim<0>::operator[](int i) const POSTHOSTDEVICE {
   return indexer(*this, i);
 }
 
 // Dynamic access to mutable Dim
-inline HOSTDEVICE int64_t& Dim<0>::operator[](int i) {
+inline int64_t& Dim<0>::operator[](int i) POSTHOSTDEVICE {
   return indexer(*this, i);
 }
 
 // Dynamic access to constant Dim
 // without std::enable_if will try to instantiate this on get<0>(d)
 template <int l>
-HOSTDEVICE typename std::enable_if<(l > 0), int64_t>::type get(const Dim<l>& d,
-                                                               int i) {
+typename std::enable_if<(l > 0), int64_t>::type get(const Dim<l>& d,
+                                                               int i) POSTHOSTDEVICE {
   return d[i];
 }
 
 // Dynamic access to mutable Dim
 template <int l>
-HOSTDEVICE typename std::enable_if<(l > 0), int64_t&>::type get(Dim<l>& d,
-                                                                int i) {
+typename std::enable_if<(l > 0), int64_t&>::type get(Dim<l>& d,
+                                                                int i) POSTHOSTDEVICE {
   return d[i];
 }
 
 // Dot product of two dims
 template <int i>
-HOSTDEVICE int64_t linearize(const Dim<i>& a, const Dim<i>& b) {
+int64_t linearize(const Dim<i>& a, const Dim<i>& b) POSTHOSTDEVICE {
   return a.head * b.head + linearize(a.tail, b.tail);
 }
 
 // Base case dot product of two Dims
 // Notice it is inline because it is no longer a template
 template <>
-HOSTDEVICE inline int64_t linearize(const Dim<0>& a, const Dim<0>& b) {
+inline int64_t linearize(const Dim<0>& a, const Dim<0>& b) POSTHOSTDEVICE {
   return 0;
 }
 
 // Product of a Dim
 template <int i>
-HOSTDEVICE int64_t product(const Dim<i>& a, int prod = 1) {
+int64_t product(const Dim<i>& a, int prod = 1) POSTHOSTDEVICE {
   return prod * a.head * product(a.tail);
 }
 
 // Base case product of a Dim
 // Notice it is inline because it is no longer a template
 template <>
-HOSTDEVICE inline int64_t product(const Dim<0>& a, int prod) {
+inline int64_t product(const Dim<0>& a, int prod) POSTHOSTDEVICE {
   return prod;
 }
 
 // Is 0 <= idx_i < size_i for all i?
 template <int i>
-HOSTDEVICE bool contained(const Dim<i>& idx, const Dim<i>& size) {
+bool contained(const Dim<i>& idx, const Dim<i>& size) POSTHOSTDEVICE {
   return ((0 <= idx.head) && (idx.head < size.head) &&
           contained(idx.tail, size.tail));
 }
@@ -286,7 +284,7 @@ HOSTDEVICE bool contained(const Dim<i>& idx, const Dim<i>& size) {
 // Base case of is 0 <= idx_i < size_i ?
 // Notice it is inline because it is no longer a template
 template <>
-HOSTDEVICE inline bool contained(const Dim<0>& idx, const Dim<0>& size) {
+inline bool contained(const Dim<0>& idx, const Dim<0>& size) POSTHOSTDEVICE {
   return true;
 }
 
@@ -294,7 +292,7 @@ HOSTDEVICE inline bool contained(const Dim<0>& idx, const Dim<0>& size) {
  * \brief Compute exclusive prefix-multiply of a Dim.
  */
 template <int i>
-HOSTDEVICE Dim<i> ex_prefix_mul(const Dim<i>& src, int mul = 1) {
+Dim<i> ex_prefix_mul(const Dim<i>& src, int mul = 1) POSTHOSTDEVICE {
   return Dim<i>(mul, ex_prefix_mul(src.tail, mul * src.head));
 }
 
@@ -302,7 +300,7 @@ HOSTDEVICE Dim<i> ex_prefix_mul(const Dim<i>& src, int mul = 1) {
 // Base case of ex_prefix_mul
 // Notice it is inline because it is no longer a template
 template <>
-HOSTDEVICE inline Dim<0> ex_prefix_mul(const Dim<0>& src, int mul) {
+inline Dim<0> ex_prefix_mul(const Dim<0>& src, int mul) POSTHOSTDEVICE {
   return Dim<0>();
 }
 ///\endcond
@@ -311,18 +309,18 @@ HOSTDEVICE inline Dim<0> ex_prefix_mul(const Dim<0>& src, int mul) {
  * Add two dimensions together
  */
 template <int i>
-HOSTDEVICE Dim<i> dim_plus(const Dim<i>& a, const Dim<i>& b) {
+Dim<i> dim_plus(const Dim<i>& a, const Dim<i>& b) POSTHOSTDEVICE {
   return Dim<i>(a.head + b.head, dim_plus(a.tail, b.tail));
 }
 
 // Base case
 template <>
-HOSTDEVICE inline Dim<0> dim_plus(const Dim<0>& a, const Dim<0>& b) {
+inline Dim<0> dim_plus(const Dim<0>& a, const Dim<0>& b) POSTHOSTDEVICE {
   return Dim<0>();
 }
 
 template <int i>
-HOSTDEVICE Dim<i> operator+(const Dim<i>& lhs, const Dim<i>& rhs) {
+Dim<i> operator+(const Dim<i>& lhs, const Dim<i>& rhs) POSTHOSTDEVICE {
   return dim_plus(lhs, rhs);
 }
 
@@ -330,18 +328,18 @@ HOSTDEVICE Dim<i> operator+(const Dim<i>& lhs, const Dim<i>& rhs) {
  * Multiply two dimensions together
  */
 template <int i>
-HOSTDEVICE Dim<i> dim_mult(const Dim<i>& a, const Dim<i>& b) {
+Dim<i> dim_mult(const Dim<i>& a, const Dim<i>& b) POSTHOSTDEVICE {
   return Dim<i>(a.head * b.head, dim_mult(a.tail, b.tail));
 }
 
 // Base case
 template <>
-HOSTDEVICE inline Dim<0> dim_mult(const Dim<0>& a, const Dim<0>& b) {
+inline Dim<0> dim_mult(const Dim<0>& a, const Dim<0>& b) POSTHOSTDEVICE {
   return Dim<0>();
 }
 
 template <int i>
-HOSTDEVICE Dim<i> operator*(const Dim<i>& lhs, const Dim<i>& rhs) {
+Dim<i> operator*(const Dim<i>& lhs, const Dim<i>& rhs) {
   return dim_mult(lhs, rhs);
 }
 
@@ -356,7 +354,7 @@ HOSTDEVICE Dim<i> operator*(const Dim<i>& lhs, const Dim<i>& rhs) {
  */
 
 template <int i>
-HOSTDEVICE Dim<i> normalize_strides(const Dim<i>& size, const Dim<i>& stride) {
+Dim<i> normalize_strides(const Dim<i>& size, const Dim<i>& stride) POSTHOSTDEVICE {
   int norm_stride = size.head == 1 ? 0 : stride.head;
   return Dim<i>(norm_stride, normalize_strides(size.tail, stride.tail));
 }
@@ -364,8 +362,8 @@ HOSTDEVICE Dim<i> normalize_strides(const Dim<i>& size, const Dim<i>& stride) {
 ///\cond HIDDEN
 
 template <>
-HOSTDEVICE inline Dim<0> normalize_strides(const Dim<0>& size,
-                                           const Dim<0>& stride) {
+inline Dim<0> normalize_strides(const Dim<0>& size,
+                                           const Dim<0>& stride) POSTHOSTDEVICE {
   return Dim<0>();
 }
 
@@ -379,7 +377,7 @@ HOSTDEVICE inline Dim<0> normalize_strides(const Dim<0>& size,
  */
 
 template <typename... Args>
-HOSTDEVICE Dim<sizeof...(Args)> make_dim(Args... idxes) {
+Dim<sizeof...(Args)> make_dim(Args... idxes) POSTHOSTDEVICE {
   return Dim<sizeof...(Args)>(idxes...);
 }
 
@@ -406,7 +404,7 @@ inline std::ostream& operator<<(std::ostream& os, const Dim<0>& d) {
 }
 
 template <int i>
-HOST std::string Dim<i>::to_string() const {
+std::string Dim<i>::to_string() const POSTHOST {
   std::stringstream stream;
 
   stream << *this;
@@ -415,7 +413,7 @@ HOST std::string Dim<i>::to_string() const {
 }
 
 template <int D>
-HOSTDEVICE Dim<D> linear_to_dimension(int linear_index, Dim<D> extents) {
+Dim<D> linear_to_dimension(int linear_index, Dim<D> extents) POSTHOSTDEVICE {
   Dim<D> result;
 
   for (int i = 0; i < D - 1; ++i) {
