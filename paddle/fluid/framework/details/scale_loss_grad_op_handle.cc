@@ -74,7 +74,7 @@ void ScaleLossGradOpHandle::RunImpl() {
   auto *tensor = local_scope.FindVar(var_name)->GetMutable<LoDTensor>();
   tensor->Resize(make_ddim({1}));
 
-#ifdef PADDLE_WITH_CUDA
+#if (defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP))
   ScaleLossGradFunctor func(coeff_, tensor, place_, this, out_dtype_,
                             this->dev_ctxes_.at(place_));
   this->RunAndRecordEvent([&] { framework::VisitDataType(out_dtype_, func); });

@@ -30,7 +30,7 @@ namespace paddle {
 namespace framework {
 namespace details {
 
-#if defined(PADDLE_WITH_CUDA) && !defined(_WIN32)
+#if ((defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP)) && !defined(_WIN32))
 AllReduceOpHandle::AllReduceOpHandle(ir::Node *node,
                                      const std::vector<Scope *> &local_scopes,
                                      const std::vector<platform::Place> &places,
@@ -77,7 +77,7 @@ void AllReduceOpHandle::RunImpl() {
   }
 
   if (platform::is_gpu_place(lod_tensors[0]->place())) {
-#if defined(PADDLE_WITH_CUDA) && !defined(_WIN32)
+#if ((defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP)) && !defined(_WIN32))
     PADDLE_ENFORCE(nccl_ctxs_, "nccl_ctxs should not be nullptr.");
     int dtype = -1;
     size_t numel = 0;
@@ -123,7 +123,11 @@ void AllReduceOpHandle::RunImpl() {
         int dev_id = boost::get<platform::CUDAPlace>(p).device;
         auto &nccl_ctx = nccl_ctxs_->at(dev_id);
         auto stream = nccl_ctx.stream();
+#ifdef PADDLE_WITH_HIP
         cudaStreamSynchronize(stream);
+#else
+        hipStreamSynchronize(stream);
+#endif
       }
     }
 

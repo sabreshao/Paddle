@@ -265,7 +265,7 @@ void ReduceOpHandle::RunImpl() {
         }
       });
     } else if (paddle::platform::is_gpu_place(lod_tensors[0]->place())) {
-#if defined(PADDLE_WITH_CUDA) && !defined(_WIN32)
+#if ((defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP)) && !defined(_WIN32))
       auto pre_in = pre_in_var->Get<framework::LoDTensor>();
       VariableVisitor::ShareDimsAndLoD(*pre_in_var, out_var);
       VariableVisitor::GetMutableTensor(out_var).mutable_data(
@@ -283,11 +283,15 @@ void ReduceOpHandle::RunImpl() {
 
         void *buffer = const_cast<void *>(lod_tensor.data<void>());
         void *recvbuffer = nullptr;
+#ifdef PADDLE_WITH_CUDA
         if (root_id == dev_id) {
+#endif
           recvbuffer =
               out_var->GetMutable<framework::LoDTensor>()->mutable_data(
                   out_var_handle->place_);
+#ifdef PADDLE_WITH_CUDA
         }
+#endif
 
         int type = platform::ToNCCLDataType(lod_tensor.type());
         size_t numel = static_cast<size_t>(lod_tensor.numel());
