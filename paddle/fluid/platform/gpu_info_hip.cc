@@ -134,16 +134,14 @@ void GpuMemcpySync(void *dst, const void *src, size_t count,
 
 void GpuMemcpyPeerAsync(void *dst, int dst_device, const void *src,
                         int src_device, size_t count, hipStream_t stream) {
-  PADDLE_ENFORCE(
-      hipMemcpyPeerAsync(dst, dst_device, src, src_device, count, stream),
-      "hipMemcpyPeerAsync failed in paddle::platform::GpuMemcpyPeerAsync");
+  PADDLE_ENFORCE(hipMemcpyAsync(dst, src, count, hipMemcpyDeviceToDevice, stream),
+                 "hipMemcpyAsync failed in paddle::platform::GpuMemcpyPeerAsync");
 }
 
 void GpuMemcpyPeerSync(void *dst, int dst_device, const void *src,
                        int src_device, size_t count) {
-  PADDLE_ENFORCE(
-      hipMemcpyPeer(dst, dst_device, src, src_device, count),
-      "cudaMemcpyPeer failed in paddle::platform::GpuMemcpyPeerSync");
+  PADDLE_ENFORCE(hipMemcpy(dst, src, count, hipMemcpyDeviceToDevice),
+                 "hipMemcpy failed in paddle::platform::GpuMemapyPeerSync");
 }
 
 void GpuMemsetAsync(void *dst, int value, size_t count, hipStream_t stream) {
