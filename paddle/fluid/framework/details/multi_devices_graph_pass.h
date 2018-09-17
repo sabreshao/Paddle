@@ -40,7 +40,7 @@ class MultiDevSSAGraphBuilder : public ir::Pass {
                          size_t device_id) const;
   void Init() const;
 
-#ifdef PADDLE_WITH_CUDA
+#if (defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP))
   mutable platform::NCCLContextMap *nccl_ctxs_;
 #endif
 

@@ -33,7 +33,7 @@ namespace distributed {
 
 using VarMsg = sendrecv::VariableMessage;
 
-#ifdef PADDLE_WITH_CUDA
+#if (defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP))
 void* GetVarPayLoad(const std::string varname, int64_t size) {
   platform::CUDAPinnedPlace cuda_pinned;
   return memory::Alloc(cuda_pinned, size);

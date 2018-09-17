@@ -30,7 +30,7 @@
 namespace paddle {
 namespace framework {
 
-#if defined(PADDLE_WITH_CUDA)
+#if (defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP))
 namespace details {
 struct CUDABuffer {
   void *data_{nullptr};
