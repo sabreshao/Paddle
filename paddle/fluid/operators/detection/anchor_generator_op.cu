@@ -110,7 +110,7 @@ class AnchorGeneratorOpCUDAKernel : public framework::OpKernel<T> {
     framework::Tensor sd;
     framework::TensorFromVector(stride, ctx.device_context(), &sd);
 
-    GenAnchors<T><<<grid, block, 0, stream>>>(
+    hipLaunchKernelGGL((GenAnchors<T>), dim3(grid), dim3(block), 0, stream,
         anchors->data<T>(), ar.data<T>(), aspect_ratios.size(), as.data<T>(),
         anchor_sizes.size(), sd.data<T>(), stride.size(), height, width,
         offset);
@@ -118,8 +118,8 @@ class AnchorGeneratorOpCUDAKernel : public framework::OpKernel<T> {
     framework::Tensor v;
     framework::TensorFromVector(variances, ctx.device_context(), &v);
     grid = (box_num * 4 + block - 1) / block;
-    SetVariance<T><<<grid, block, 0, stream>>>(vars->data<T>(), v.data<T>(),
-                                               variances.size(), box_num * 4);
+    hipLaunchKernelGGL((SetVariance<T>), dim3(grid), dim3(block), 0, stream, 
+         vars->data<T>(), v.data<T>(), variances.size(), box_num * 4);
   }
 };  // namespace operators
 

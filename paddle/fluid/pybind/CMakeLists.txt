@@ -21,5 +21,5 @@ if(WITH_PYTHON)
     endif(NOT APPLE AND NOT ANDROID AND NOT WIN32)
   endif(WITH_AMD_GPU)
 
-  hip_test(tensor_py_test SRCS tensor_py_test.cc DEPS python)
+  cc_test(tensor_py_test SRCS tensor_py_test.cc DEPS python)
 endif(WITH_PYTHON)

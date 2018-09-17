@@ -129,18 +129,17 @@ class ArgsortOpCUDAKernel : public framework::OpKernel<T> {
     auto stream = ctx.cuda_device_context().stream();
     const int num_threads = PADDLE_CUDA_NUM_THREADS;
 
-    ComputeTargetIdx<<<(numel - 1) / num_threads + 1, num_threads, 0, stream>>>(
-        in_dims_data, in_dims.size(), axis, numel, trg_idx, med_ids_data);
+    hipLaunchKernelGGL((ComputeTargetIdx), dim3((numel - 1) / num_threads + 1), dim3(num_threads), 0, stream, 
+        in_dims_data, in_dims.size(), axis, numel, trg_idx, med_ids_data);   
 
-    PermuteInData<<<(numel - 1) / num_threads + 1, num_threads, 0, stream>>>(
+    hipLaunchKernelGGL((PermuteInData<T>), dim3((numel - 1) / num_threads + 1), dim3(num_threads), 0, stream, 
         in_data, trg_idx, numel, med_out_data);
 
-    Sort<<<(groups - 1) / num_threads + 1, num_threads, 0, stream>>>(
+    hipLaunchKernelGGL((Sort<T>), dim3((groups - 1) / num_threads + 1), dim3(num_threads), 0, stream,
         in_dims[axis], groups, med_out_data, med_ids_data);
 
-    PermuteMediateData<<<(numel - 1) / num_threads + 1, num_threads, 0,
-                         stream>>>(med_out_data, med_ids_data, trg_idx, numel,
-                                   out_data, ids_data);
+    hipLaunchKernelGGL((PermuteMediateData<T>), dim3((numel - 1) / num_threads + 1), dim3(num_threads), 0, stream,
+        med_out_data, med_ids_data, trg_idx, numel, out_data, ids_data);
   }
 };
 

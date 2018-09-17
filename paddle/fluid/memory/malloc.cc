@@ -146,7 +146,11 @@ void* Alloc<platform::CUDAPlace>(platform::CUDAPlace place, size_t size) {
     platform::SetDeviceId(cur_dev);
   }
   if (FLAGS_init_allocated_mem) {
+#ifdef PADDLE_WITH_CUDA
     cudaMemset(ptr, 0xEF, size);
+#elif PADDLE_WITH_HIP
+    hipMemset(ptr, 0xEF, size);
+#endif
   }
   return ptr;
 }
