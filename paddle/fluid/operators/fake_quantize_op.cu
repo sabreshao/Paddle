@@ -62,14 +62,13 @@ float FindAbsMaxGpu(const platform::CUDADeviceContext& ctx, const float* array,
   framework::Tensor t;
   float* device_max = t.mutable_data<float>(framework::make_ddim({gridDimx}),
                                             platform::CUDAPlace());
-  FindAbsMaxKernel<float><<<gridDimx, kNumTheads, kNumTheads * sizeof(float),
-                            ctx.stream()>>>(length, array, device_max);
-  FindAbsMaxKernel<
-      float><<<1, kNumTheads, kNumTheads * sizeof(float), ctx.stream()>>>(
-      gridDimx, device_max, device_max);
+  hipLaunchKernelGGL((FindAbsMaxKernel<float>), dim3(gridDimx), dim3(kNumTheads), kNumTheads * sizeof(float), ctx.stream(),
+       length, array, device_max);
+  hipLaunchKernelGGL((FindAbsMaxKernel<float>), dim3(1), dim3(kNumTheads), kNumTheads * sizeof(float), ctx.stream(), 
+       gridDimx, device_max, device_max);
   PADDLE_ENFORCE_EQ(
-      cudaMemcpy(&host_max, device_max, sizeof(float), cudaMemcpyDeviceToHost),
-      cudaSuccess, "cudaMemcpy failed");
+      hipMemcpy(&host_max, device_max, sizeof(float), hipMemcpyDeviceToHost),
+      hipSuccess, "hipMemcpy failed");
   return host_max;
 }
 
@@ -138,15 +137,15 @@ int ApplySaturateGpu(const platform::CUDADeviceContext& ctx, const int n,
   framework::Tensor t;
   int* device_num_saturate = t.mutable_data<int>(
       framework::make_ddim({gridDimx}), platform::CUDAPlace());
-  ApplySaturateKernel<
-      T><<<gridDimx, kNumTheads, kNumTheads * sizeof(T), ctx.stream()>>>(
-      n, in, out, device_num_saturate, min, max);
-  ReduceKernel<int><<<1, kNumTheads, kNumTheads * sizeof(T), ctx.stream()>>>(
-      gridDimx, device_num_saturate, device_num_saturate);
-  PADDLE_ENFORCE_EQ(cudaSuccess,
-                    cudaMemcpy(&host_num_saturate, device_num_saturate,
-                               sizeof(int), cudaMemcpyDeviceToHost),
-                    "cudaMemcpy failed");
+  
+  hipLaunchKernelGGL((ApplySaturateKernel<T>), dim3(gridDimx), dim3(kNumTheads), kNumTheads * sizeof(T), ctx.stream(), 
+        n, in, out, device_num_saturate, min, max); 
+  hipLaunchKernelGGL((ReduceKernel<int>), dim3(1), dim3(kNumTheads), kNumTheads * sizeof(T), ctx.stream(), 
+        gridDimx, device_num_saturate, device_num_saturate);
+  PADDLE_ENFORCE_EQ(hipSuccess,
+                    hipMemcpy(&host_num_saturate, device_num_saturate,
+                               sizeof(int), hipMemcpyDeviceToHost),
+                    "hipMemcpy failed");
   return host_num_saturate;
 }
 

@@ -27,7 +27,7 @@
 namespace paddle {
 namespace framework {
 
-#if defined(PADDLE_WITH_CUDA)
+#if (defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP))
 // Vector<T> implements the std::vector interface, and can get Data or
 // MutableData from any place. The data will be synced implicitly inside.
 template <typename T>

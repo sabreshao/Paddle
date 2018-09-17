@@ -46,7 +46,7 @@ class MultiDevSSAGraphBuilder : public ir::Pass {
   mutable std::vector<Scope *> local_scopes_;
   mutable std::unordered_set<std::string> grad_names_;
 
-#ifdef PADDLE_WITH_CUDA
+#if (defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP))
   mutable platform::NCCLContextMap *nccl_ctxs_;
 #endif
 

@@ -87,7 +87,6 @@ cc_library(op_info SRCS op_info.cc DEPS attribute framework_proto)
 cc_library(shape_inference SRCS shape_inference.cc DEPS ddim attribute device_context)
 cc_library(operator SRCS operator.cc DEPS op_info device_context tensor scope glog
     shape_inference data_transform lod_tensor profiler)
-cc_test(operator_test SRCS operator_test.cc DEPS operator op_registry device_context)
 hip_test(operator_test SRCS operator_test.cc DEPS operator op_registry device_context)
 cc_library(proto_desc SRCS var_desc.cc op_desc.cc block_desc.cc program_desc.cc DEPS shape_inference op_info operator glog)
 
@@ -121,15 +120,14 @@ endif()
 cc_library(parallel_executor SRCS parallel_executor.cc DEPS threaded_ssa_graph_executor scope_buffered_ssa_graph_executor graph graph_viz_pass multi_devices_graph_pass multi_devices_graph_print_pass multi_devices_graph_check_pass)
 
 cc_library(prune SRCS prune.cc DEPS framework_proto)
-hip_test(prune_test SRCS prune_test.cc DEPS op_info prune recurrent_op device_context)
-hip_test(var_type_inference_test SRCS var_type_inference_test.cc DEPS op_registry
+cc_test(prune_test SRCS prune_test.cc DEPS op_info prune recurrent_op device_context)
+cc_test(var_type_inference_test SRCS var_type_inference_test.cc DEPS op_registry
         proto_desc)
 cc_library(selected_rows SRCS selected_rows.cc DEPS tensor)
-hip_test(selected_rows_test SRCS selected_rows_test.cc DEPS selected_rows)
+cc_test(selected_rows_test SRCS selected_rows_test.cc DEPS selected_rows)
 
 cc_test(op_kernel_type_test SRCS op_kernel_type_test.cc DEPS place device_context framework_proto)
 cc_test(cow_ptr_tests SRCS details/cow_ptr_test.cc)
-<<<<<<< HEAD
 
 # cc_test(channel_test SRCS channel_test.cc)
 cc_test(tuple_test SRCS tuple_test.cc )
@@ -141,5 +139,3 @@ cc_test(rw_lock_test SRCS rw_lock_test.cc)
 # cc_test(concurrency_test SRCS concurrency_test.cc DEPS go_op channel_close_op channel_create_op
 #         channel_send_op channel_recv_op sum_op select_op elementwise_add_op compare_op
 #         conditional_block_op while_op assign_op print_op executor proto_desc)
-hip_test(tuple_test SRCS tuple_test.cc)
-hip_test(rw_lock_test SRCS rw_lock_test.cc)

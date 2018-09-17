@@ -42,7 +42,7 @@ std::unique_ptr<ir::Graph> ApplyParallelExecutorPass(
     const std::string &loss_var_name,
     const std::unordered_set<std::string> &param_names,
     const std::vector<Scope *> &local_scopes, const bool use_cuda,
-#ifdef PADDLE_WITH_CUDA
+#if (defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP))
     const BuildStrategy &strategy, platform::NCCLContextMap *nccl_ctxs) {
 #else
     const BuildStrategy &strategy) {
@@ -72,7 +72,7 @@ std::unique_ptr<ir::Graph> ApplyParallelExecutorPass(
                                                               &local_scopes);
   multi_devices_pass->SetNotOwned<const BuildStrategy>("strategy", &strategy);
 
-#ifdef PADDLE_WITH_CUDA
+#if (defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP))
   platform::NCCLContextMap *nctx = use_cuda ? nccl_ctxs : nullptr;
   multi_devices_pass->SetNotOwned<platform::NCCLContextMap>("nccl_ctxs", nctx);
 #endif

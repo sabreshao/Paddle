@@ -191,6 +191,7 @@ class BatchNormKernel<platform::CUDADeviceContext, T>
                          ctx.GetPlace()),
             (void*)saved_variance->template mutable_data<BatchNormParamType<T>>(
                 ctx.GetPlace())));
+      }
     }
 
     // clean when exit.

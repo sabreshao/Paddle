@@ -18,6 +18,7 @@
 #include "paddle/fluid/framework/tensor.h"
 
 #ifdef PADDLE_WITH_MKLML
+#pragma message("+++++++++ IN MKLML ++++++")
 #include "paddle/fluid/platform/dynload/mklml.h"
 #endif
 

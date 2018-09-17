@@ -14,6 +14,9 @@ limitations under the License. */
 
 #pragma once
 
+#include "hip/hip_fp16.h"
+#include "hip/hip_runtime.h"
+
 namespace paddle {
 namespace platform {
 
@@ -44,11 +47,12 @@ static __forceinline__ __device__ double CudaShuffleSync(unsigned mask, double v
 }
 
 
-
+#if 0
 template <typename T>
 HOSTDEVICE T Infinity() {
   return INFINITY;
 }
+#endif
 
 template <typename T>
 __device__ T reduceSum(T val, int tid, int len) {
