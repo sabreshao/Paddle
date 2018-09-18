@@ -15,7 +15,13 @@ limitations under the License. */
 #include "hip/hip_runtime.h"
 #define EIGEN_USE_GPU
 
+#if defined(PADDLE_WITH_CUDA)
 #include <cub/cub.cuh>
+namespace gpuprim = ::cub;
+#elif defined(PADDLE_WITH_HIP)
+#include <hipcub/hipcub.hpp>
+namespace gpuprim = ::hipcub;
+#endif
 #include "paddle/fluid/operators/math/cross_entropy.h"
 #include "paddle/fluid/operators/softmax_with_cross_entropy_op.h"
 
@@ -110,7 +116,7 @@ Step 3 (RowReductionForSoftmaxAndCrossEntropy): calculate tmp_i_j = softmax'_i_j
 // BLOCK_REDUCE_WARP_REDUCTIONS (default)
 template <typename T, int BlockDim>
 using BlockReduce =
-    cub::BlockReduce<T, BlockDim /*, cub::BLOCK_REDUCE_WARP_REDUCTIONS*/>;
+    gpuprim::BlockReduce<T, BlockDim /*, cub::BLOCK_REDUCE_WARP_REDUCTIONS*/>;
 
 template <typename T, int BlockDim>
 using BlockReduceTempStorage = typename BlockReduce<T, BlockDim>::TempStorage;
@@ -134,7 +140,7 @@ __global__ void RowReductionForMax(const T* logits_data, T* max_data,
     beg_idx += BlockDim;
   }
 
-  cur_max = BlockReduce<T, BlockDim>(temp_storage).Reduce(cur_max, cub::Max());
+  cur_max = BlockReduce<T, BlockDim>(temp_storage).Reduce(cur_max, gpuprim::Max());
 
   if (threadIdx.x == 0) {
     max_data[blockIdx.x] = cur_max < -64 ? -64 : cur_max;
@@ -162,7 +168,7 @@ __global__ void RowReductionForDiffMaxSum(const T* logits_data, T* max_data,
   }
 
   diff_max_sum =
-      BlockReduce<T, BlockDim>(temp_storage).Reduce(diff_max_sum, cub::Sum());
+      BlockReduce<T, BlockDim>(temp_storage).Reduce(diff_max_sum, gpuprim::Sum());
   if (threadIdx.x == 0) max_data[blockIdx.x] = real_log(diff_max_sum);
 }
 
@@ -190,7 +196,7 @@ __global__ void RowReductionForSoftmaxAndCrossEntropy(const T* logits_data,
     beg_idx += BlockDim;
   }
 
-  loss = BlockReduce<T, BlockDim>(temp_storage).Reduce(loss, cub::Sum());
+  loss = BlockReduce<T, BlockDim>(temp_storage).Reduce(loss, gpuprim::Sum());
   if (threadIdx.x == 0) loss_data[blockIdx.x] = loss;
 }
 
@@ -205,12 +211,16 @@ static void SoftmaxWithCrossEntropyFusedKernel(const T* logits_data,
                                                const T* labels_data,
                                                T* softmax_data, T* loss_data,
                                                int batch_size, int feature_size,
+#if defined(PADDLE_WITH_CUDA)
                                                cudaStream_t stream) {
+#elif defined(PADDLE_WITH_HIP)
+                                               hipStream_t stream) {
+#endif
   constexpr int kMaxBlockDim = 512;
   int block_dim = feature_size >= kMaxBlockDim
                       ? kMaxBlockDim
                       : (1 << static_cast<int>(std::log2(feature_size)));
-
+#if defined(PADDLE_WITH_CUDA)
 #define CALL_SOFTMAX_WITH_CROSS_ENTROPY_FUSED_KERNEL(BlockDim)                \
   case BlockDim:                                                              \
     RowReductionForMax<T, BlockDim><<<batch_size, BlockDim, 0, stream>>>(     \
@@ -222,7 +232,20 @@ static void SoftmaxWithCrossEntropyFusedKernel(const T* logits_data,
         T, BlockDim><<<batch_size, BlockDim, 0, stream>>>(                    \
         logits_data, labels_data, loss_data, softmax_data, feature_size);     \
     break
-
+#elif defined(PADDLE_WITH_HIP)
+#define CALL_SOFTMAX_WITH_CROSS_ENTROPY_FUSED_KERNEL(BlockDim)                \
+  case BlockDim:                                                              \
+    hipLaunchKernelGGL((RowReductionForMax<T, BlockDim>),                     \
+        dim3(batch_size), dim3(BlockDim), 0, stream,                          \
+        logits_data, loss_data, feature_size);                                \
+    hipLaunchKernelGGL((RowReductionForDiffMaxSum<T,BlockDim>),               \
+                        dim3(batch_size), dim3(BlockDim), 0, stream,          \
+        logits_data, loss_data, softmax_data, feature_size);                  \
+    hipLaunchKernelGGL((RowReductionForSoftmaxAndCrossEntropy<                \
+        T, BlockDim>), dim3(batch_size), dim3(BlockDim), 0, stream,           \
+        logits_data, labels_data, loss_data, softmax_data, feature_size);     \
+    break
+#endif
   switch (block_dim) {
     CALL_SOFTMAX_WITH_CROSS_ENTROPY_FUSED_KERNEL(512);
     CALL_SOFTMAX_WITH_CROSS_ENTROPY_FUSED_KERNEL(256);
@@ -234,11 +257,19 @@ static void SoftmaxWithCrossEntropyFusedKernel(const T* logits_data,
     CALL_SOFTMAX_WITH_CROSS_ENTROPY_FUSED_KERNEL(4);
     CALL_SOFTMAX_WITH_CROSS_ENTROPY_FUSED_KERNEL(2);
     case 1:
+#if defined(PADDLE_WITH_CUDA)
       SetSoftmaxToOneWhenFeatureSizeIsOne<<<(batch_size + kMaxBlockDim - 1) /
                                                 kMaxBlockDim,
                                             kMaxBlockDim, 0, stream>>>(
           softmax_data, batch_size);
       cudaMemsetAsync(loss_data, 0, batch_size, stream);
+#elif defined(PADDLE_WITH_HIP)
+      hipLaunchKernelGGL((SetSoftmaxToOneWhenFeatureSizeIsOne), 
+                                  dim3((batch_size + kMaxBlockDim - 1) /kMaxBlockDim),
+                                  dim3(kMaxBlockDim), 0, stream,
+          softmax_data, batch_size);
+      hipMemsetAsync(loss_data, 0, batch_size, stream);
+#endif
       break;
     default:
       PADDLE_THROW("BlockDim must be 2^n in softmax_with_cross_entropy_op");
@@ -328,8 +359,8 @@ class SoftmaxWithCrossEntropyGradCUDAKernel : public framework::OpKernel<T> {
 
 namespace ops = paddle::operators;
 REGISTER_OP_CUDA_KERNEL(softmax_with_cross_entropy,
-                        ops::SoftmaxWithCrossEntropyCUDAKernel<float>,
-                        ops::SoftmaxWithCrossEntropyCUDAKernel<double>);
+                        ops::SoftmaxWithCrossEntropyCUDAKernel<float>);
+//                        ops::SoftmaxWithCrossEntropyCUDAKernel<double>);
 REGISTER_OP_CUDA_KERNEL(softmax_with_cross_entropy_grad,
-                        ops::SoftmaxWithCrossEntropyGradCUDAKernel<float>,
-                        ops::SoftmaxWithCrossEntropyGradCUDAKernel<double>);
+                        ops::SoftmaxWithCrossEntropyGradCUDAKernel<float>);
+//                        ops::SoftmaxWithCrossEntropyGradCUDAKernel<double>);
