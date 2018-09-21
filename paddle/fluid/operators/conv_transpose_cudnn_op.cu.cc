@@ -87,6 +87,7 @@ class CUDNNConvTransposeOpKernel : public framework::OpKernel<T> {
     auto handle = dev_ctx.miopen_handle();
     miopenConvAlgoPerf_t perfRes;
     int algoCount = 0;
+    void* cudnn_workspace = nullptr;
     // Get the algorithm
     PADDLE_ENFORCE(platform::dynload::miopenFindConvolutionBackwardDataAlgorithm(
         handle, cudnn_input_desc, input_data,cudnn_filter_desc, filter_data, cudnn_conv_desc,

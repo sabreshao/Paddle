@@ -126,7 +126,7 @@ class CUDNNConvOpKernel : public framework::OpKernel<T> {
                       "workspace_size to be allocated exceeds the limit");
     // Allocate on GPU memory
     platform::CUDAPlace gpu = boost::get<platform::CUDAPlace>(ctx.GetPlace());
-    cudnn_workspace = paddle::memory::Alloc(gpu, workspace_size_in_bytes);
+    void* cudnn_workspace = paddle::memory::Alloc(gpu, workspace_size_in_bytes);
     ScalingParamType<T> alpha = 1.0f, beta = 0.0f;
     miopenConvAlgoPerf_t perfRes;
     int algoCount = 0;
