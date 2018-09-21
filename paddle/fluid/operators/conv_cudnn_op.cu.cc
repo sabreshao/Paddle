@@ -122,7 +122,7 @@ class CUDNNConvOpKernel : public framework::OpKernel<T> {
     PADDLE_ENFORCE(platform::dynload::miopenConvolutionForwardGetWorkSpaceSize(
         handle, cudnn_filter_desc, cudnn_input_desc, cudnn_conv_desc,
         cudnn_output_desc, &workspace_size_in_bytes));
-    PADDLE_ENFORCE_LE(workspace_size_limit, workspace_size_in_bytes,
+    PADDLE_ENFORCE_LE(workspace_size_in_bytes, workspace_size_limit,
                       "workspace_size to be allocated exceeds the limit");
     // Allocate on GPU memory
     platform::CUDAPlace gpu = boost::get<platform::CUDAPlace>(ctx.GetPlace());
