@@ -20,7 +20,13 @@
 #include <set>
 #include <vector>
 
+#if defined(PADDLE_WITH_CUDA)
 #include <cub/cub.cuh>  // NOLINT
+#elif defined(PADDLE_WITH_HIP)
+#include "hip/hip_runtime.h"
+#include <hipcub/hipcub.hpp>
+namespace cub = ::hipcub;
+#endif
 #include "paddle/fluid/framework/tensor.h"
 
 namespace paddle {
@@ -160,7 +166,11 @@ static void TensorReduceImpl(
     int left_num, int reduce_num, const std::vector<int>& x_strides,
     const std::vector<int>& reduce_dim, const std::vector<int>& reduce_strides,
     const std::vector<int>& left_dim, const std::vector<int>& left_strides,
+#if defined(PADDLE_WITH_CUDA)
     cudaStream_t stream) {
+#elif defined(PADDLE_WITH_HIP)
+    hipStream_t stream) {
+#endif
 #define CUB_RANK_CASE(i, ...)             \
   case i: {                               \
     constexpr auto kRank = i;             \
@@ -170,8 +180,8 @@ static void TensorReduceImpl(
 #define CUB_REDUCE_RANK_CASE(i, ...)                              \
   case i: {                                                       \
     constexpr auto kReduceRank = i;                               \
-    ReduceKernel<Tx, Ty, ReduceOp, TransformOp, BlockDim, kRank,  \
-                 kReduceRank><<<left_num, BlockDim, 0, stream>>>( \
+    hipLaunchKernelGGL((ReduceKernel<Tx, Ty, ReduceOp, TransformOp, BlockDim, kRank, kReduceRank>), \
+        dim3(left_num), dim3(BlockDim), 0, stream, \
         x_data, y_data, reducer, transformer, init, reduce_num,   \
         Array<int, kRank>::From(x_strides),                       \
         Array<int, kReduceRank>::From(reduce_dim),                \
@@ -197,8 +207,8 @@ static void TensorReduceImpl(
     return;
   }
   if (rank == 2 && reduce_rank == 1 && reduce_dim[0] == 1) {
-    ReduceKernel2D<Tx, Ty, ReduceOp, TransformOp,
-                   BlockDim><<<left_num, BlockDim, 0, stream>>>(
+    hipLaunchKernelGGL((ReduceKernel2D<Tx, Ty, ReduceOp, TransformOp, BlockDim>),
+        dim3(left_num), dim3(BlockDim), 0, stream,
         x_data, y_data, reducer, transformer, init, reduce_num);
     return;
   }
@@ -249,7 +259,11 @@ template <typename Tx, typename Ty, typename ReduceOp, typename TransformOp>
 void TensorReduce(const framework::Tensor& x, framework::Tensor* y,
                   std::vector<int> origin_reduce_dims, const Ty& init,
                   const ReduceOp& reducer, const TransformOp& transformer,
+#if defined(PADDLE_WITH_CUDA)
                   cudaStream_t stream) {
+#elif defined(PADDLE_WITH_HIP)
+                  hipStream_t stream) {
+#endif
   auto x_dim = framework::vectorize2int(x.dims());
   std::vector<int> new_x_dim, new_reduce_dims;
   int is_reduced = 0;

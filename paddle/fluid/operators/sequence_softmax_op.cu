@@ -13,7 +13,13 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 #include <algorithm>
-#include <cub/cub.cuh>  // NOLINT
+#if defined(PADDLE_WITH_CUDA)
+#include <cub/cub.cuh>
+#elif defined(PADDLE_WITH_HIP)
+#include "hip/hip_runtime.h"
+#include <hipcub/hipcub.hpp>
+namespace cub = ::hipcub;
+#endif
 #include "paddle/fluid/operators/sequence_softmax_op.h"
 
 namespace paddle {
@@ -126,8 +132,8 @@ struct SequenceSoftmaxFunctor<platform::CUDADeviceContext, T> {
 
     dim3 block_size(thread_x);
     dim3 grid_size(max_blocks);
-    sequence_softmax_kernel<
-        T, kThreadsPerBlock><<<grid_size, block_size, 0, context.stream()>>>(
+    hipLaunchKernelGGL((sequence_softmax_kernel<T, kThreadsPerBlock>),
+        dim3(grid_size), dim3(block_size), 0, context.stream(),
         x.data<T>(), ref_lod.CUDAData(context.GetPlace()), hight,
         out->mutable_data<T>(context.GetPlace()));
   }
@@ -149,8 +155,8 @@ struct SequenceSoftmaxGradFunctor<platform::CUDADeviceContext, T> {
     dim3 block_size(thread_x);
     dim3 grid_size(max_blocks);
 
-    sequence_softmax_grad_kernel<
-        T, kThreadsPerBlock><<<grid_size, block_size, 0, context.stream()>>>(
+    hipLaunchKernelGGL((sequence_softmax_grad_kernel<T, kThreadsPerBlock>),
+        dim3(grid_size), dim3(block_size), 0, context.stream(),
         dout.data<T>(), out.data<T>(), ref_lod.CUDAData(context.GetPlace()),
         hight, dx->mutable_data<T>(context.GetPlace()));
   }

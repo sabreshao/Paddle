@@ -330,7 +330,7 @@ class DepthwiseConvFunctor<platform::CUDADeviceContext, T> {
   if (c_filter_multiplier == 0 ||                                            \
       filter_multiplier == c_filter_multiplier &&                            \
           stride_height == stride_width && stride_height == c_stride) {      \
-    hipLaunchKernelGGL(KernelDepthwiseConvSp<T, c_filter_multiplier, c_stride>), \
+    hipLaunchKernelGGL((KernelDepthwiseConvSp<T, c_filter_multiplier, c_stride>), \
         dim3(grid), dim3(threads), 0, context.stream(), \
         input_data, filter_data, batch_size, output_channels, output_height, \
         output_width, input_channels, input_height, input_width,             \
@@ -379,7 +379,6 @@ class DepthwiseConvInputGradFunctor<platform::CUDADeviceContext, T> {
     const T* output_grad_data = output_grad.data<T>();
     T* input_grad_data = input_grad->mutable_data<T>(context.GetPlace());
 
-<<<<<<< HEAD
     int thread = 512;
     int blocks = std::min(std::max(thread / input_width, 1), input_height);
     dim3 threads(std::min(input_width, thread), blocks, 1);
@@ -390,9 +389,8 @@ class DepthwiseConvInputGradFunctor<platform::CUDADeviceContext, T> {
   if (c_filter_multiplier == 0 ||                                       \
       filter_multiplier == c_filter_multiplier &&                       \
           stride_height == stride_width && stride_height == c_stride) { \
-    KernelDepthwiseConvInputGradSp<                                     \
-        T, c_filter_multiplier,                                         \
-        c_stride><<<grid, threads, 0, context.stream()>>>(              \
+    hipLaunchKernelGGL((KernelDepthwiseConvInputGradSp<T, c_filter_multiplier, c_stride>), \
+        dim3(grid), dim3(threads), 0, context.stream(),                 \
         output_grad_data, filter_data, batch_size, output_channels,     \
         output_height, output_width, input_channels, input_height,      \
         input_width, filter_multiplier, ksize_height, ksize_width,      \
@@ -406,19 +404,6 @@ class DepthwiseConvInputGradFunctor<platform::CUDADeviceContext, T> {
     // add other case if needed, e.g. check_case(2^n,1)
     check_case(0, 0);
 #undef check_case
-=======
-    int nthreads = batch_size * input_channels * input_height * input_width;
-    int blocks = (nthreads + 1024 - 1) / 1024;
-    dim3 threads(1024, 1);
-    dim3 grid(blocks, 1);
-
-    hipLaunchKernelGGL((KernelDepthwiseConvInputGrad<T>), dim3(grid), dim3(threads), 0, context.stream(),
-        nthreads, output_grad_data, filter_data, batch_size, output_channels,
-        output_height, output_width, input_channels, input_height, input_width,
-        output_channels / input_channels, ksize_height, ksize_width,
-        stride_height, stride_width, padding_height, padding_width,
-        input_grad_data);
->>>>>>> Add HIP support to fluid/operator.
   }
 };
 
@@ -452,7 +437,6 @@ class DepthwiseConvFilterGradFunctor<platform::CUDADeviceContext, T> {
     const T* output_grad_data = output_grad.data<T>();
     T* filter_grad_data = filter_grad->mutable_data<T>(context.GetPlace());
 
-<<<<<<< HEAD
     int block_size = 512;
     int crop_output_height =
         std::min(std::max(block_size / output_width, 1), output_height);
@@ -462,8 +446,8 @@ class DepthwiseConvFilterGradFunctor<platform::CUDADeviceContext, T> {
 
 #define check_case(c_filter_multiplier)                                       \
   if (c_filter_multiplier == 0 || c_filter_multiplier == filter_multiplier) { \
-    KernelDepthwiseConvFilterGradSp<                                          \
-        T, c_filter_multiplier><<<grid, threads, 0, context.stream()>>>(      \
+    hipLaunchKernelGGL((KernelDepthwiseConvFilterGradSp<T, c_filter_multiplier>), \
+        dim3(grid), dim3(threads), 0, context.stream(),                       \
         output_grad_data, input_data, batch_size, output_channels,            \
         output_height, output_width, input_channels, input_height,            \
         input_width, filter_multiplier, ksize_height, ksize_width,            \
@@ -474,20 +458,6 @@ class DepthwiseConvFilterGradFunctor<platform::CUDADeviceContext, T> {
     check_case(1);
     check_case(0);
 #undef check_case
-=======
-    int nthreads = batch_size * output_channels * output_height * output_width;
-
-    int blocks = (nthreads + 1024 - 1) / 1024;
-    dim3 threads(1024, 1);
-    dim3 grid(blocks, 1);
-
-    hipLaunchKernelGGL((KernelDepthwiseConvFilterGrad<T>), dim3(grid), dim3(threads), 0, context.stream(),
-        nthreads, output_grad_data, input_data, batch_size, output_channels,
-        output_height, output_width, input_channels, input_height, input_width,
-        output_channels / input_channels, ksize_height, ksize_width,
-        stride_height, stride_width, padding_height, padding_width,
-        filter_grad_data);
->>>>>>> Add HIP support to fluid/operator.
   }
 };
 

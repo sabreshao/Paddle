@@ -88,8 +88,8 @@ __global__ void LayerNormForward(const T *x, const T *scale, const T *bias,
     var_val += (tmp * tmp);
   }
   auto pair = BlockReduce(temp_storage)
-                  .Reduce(PairForLayerNorm<double>(mean_val, var_val),
-                          PairForLayerNormAddFunctor<double>());
+                  .Reduce(PairForLayerNorm<T>(mean_val, var_val),
+                          PairForLayerNormAddFunctor<T>());
   if (threadIdx.x == 0) {
     auto tmp = pair.first_ / feature_size;
     mean[blockIdx.x] = static_cast<T>(tmp);

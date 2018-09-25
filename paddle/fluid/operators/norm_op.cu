@@ -13,7 +13,13 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 #include <algorithm>
-#include "cub/cub.cuh"
+#if defined(PADDLE_WITH_CUDA)
+#include <cub/cub.cuh>
+#elif defined(PADDLE_WITH_HIP)
+#include "hip/hip_runtime.h"
+#include <hipcub/hipcub.hpp>
+namespace cub = ::hipcub;
+#endif
 #include "paddle/fluid/operators/norm_op.h"
 
 namespace paddle {
@@ -78,7 +84,7 @@ class NormCUDAKernel : public framework::OpKernel<T> {
     int max_threads = dev_ctx.GetMaxPhysicalThreadCount();
     const int max_blocks = std::max(max_threads / block, 1);
     int grid = std::min(max_blocks, pre * post);
-    Normalize<T, block><<<grid, block, 0, dev_ctx.stream()>>>(x, pre, n, post,
+    hipLaunchKernelGGL((Normalize<T, block>), dim3(grid), dim3(block), 0, dev_ctx.stream(), x, pre, n, post,
                                                               eps, y, norm);
   }
 };
@@ -144,7 +150,7 @@ class NormGradCUDAKernel : public framework::OpKernel<T> {
     int max_threads = dev_ctx.GetMaxPhysicalThreadCount();
     const int max_blocks = std::max(max_threads / block, 1);
     int grid = std::min(max_blocks, pre * post);
-    NormalizeGradient<T, block><<<grid, block, 0, dev_ctx.stream()>>>(
+    hipLaunchKernelGGL((NormalizeGradient<T, block>), dim3(grid), dim3(block), 0, dev_ctx.stream(),
         x, x_norm, dy, pre, n, post, dx);
   }
 };

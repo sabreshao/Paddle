@@ -160,7 +160,7 @@ struct ClipAndFakeQuantFunctor<platform::CUDADeviceContext, T> {
     const T* scale_data = scale.data<T>();
     T* out_data = out->mutable_data<T>(ctx.GetPlace());
 
-    ClipAndQuantKernel<T><<<grid, block, 0, ctx.stream()>>>(
+    hipLaunchKernelGGL((ClipAndQuantKernel<T>), dim3(grid), dim3(block), 0, ctx.stream(),
         in_data, scale_data, bin_cnt, num, out_data);
   }
 };

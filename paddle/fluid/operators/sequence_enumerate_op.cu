@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "hip/hip_runtime.h"
 #include <thrust/device_vector.h>
 #include <thrust/host_vector.h>
 #include "paddle/fluid/operators/sequence_enumerate_op.h"
@@ -69,8 +70,7 @@ class SequenceEnumerateOpCUDAKernel : public framework::OpKernel<T> {
     // Copy LoD to GPU
     const size_t* dev_in_lod_ptr = lod0.CUDAData(context.GetPlace());
     // Calc output tensor
-    CalcOutPut<<<(in_len - 1) / PADDLE_CUDA_NUM_THREADS + 1,
-                 PADDLE_CUDA_NUM_THREADS, 0, stream>>>(
+    hipLaunchKernelGGL((CalcOutPut<T>), dim3((in_len - 1) / PADDLE_CUDA_NUM_THREADS + 1), dim3(PADDLE_CUDA_NUM_THREADS), 0, stream,
         in_data, dev_in_lod_ptr, lod0.size(), win_size, pad_value, out_data);
   }
 };
