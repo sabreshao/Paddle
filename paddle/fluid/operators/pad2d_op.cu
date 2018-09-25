@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 /* Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -317,15 +318,15 @@ class Pad2dCUDAKernel : public framework::OpKernel<T> {
       const int out_height = out_dims[2];
       const int out_width = out_dims[3];
       if (mode == "reflect") {
-        Pad2DReflectNCHW<T><<<grid, block, 0, stream>>>(
+        hipLaunchKernelGGL((Pad2DReflectNCHW<T>), dim3(grid), dim3(block), 0, stream,
             out_size, in_data, num, channels, in_height, in_width, out_height,
             out_width, pad_top, pad_left, out_data);
       } else if (mode == "edge") {
-        Pad2DEdgeNCHW<T><<<grid, block, 0, stream>>>(
+        hipLaunchKernelGGL((Pad2DEdgeNCHW<T>), dim3(grid), dim3(block), 0, stream,
             out_size, in_data, num, channels, in_height, in_width, out_height,
             out_width, pad_top, pad_left, out_data);
       } else {
-        Pad2DConstNCHW<T><<<grid, block, 0, stream>>>(
+        hipLaunchKernelGGL((Pad2DConstNCHW<T>), dim3(grid), dim3(block), 0, stream,
             out_size, in_data, num, channels, in_height, in_width, out_height,
             out_width, pad_top, pad_left, value, out_data);
       }
@@ -336,15 +337,15 @@ class Pad2dCUDAKernel : public framework::OpKernel<T> {
       const int out_height = out_dims[1];
       const int out_width = out_dims[2];
       if (mode == "reflect") {
-        Pad2DReflectNHWC<T><<<grid, block, 0, stream>>>(
+        hipLaunchKernelGGL((Pad2DReflectNHWC<T>), dim3(grid), dim3(block), 0, stream,
             out_size, in_data, num, channels, in_height, in_width, out_height,
             out_width, pad_top, pad_left, out_data);
       } else if (mode == "edge") {
-        Pad2DEdgeNHWC<T><<<grid, block, 0, stream>>>(
+        hipLaunchKernelGGL((Pad2DEdgeNHWC<T>), dim3(grid), dim3(block), 0, stream,
             out_size, in_data, num, channels, in_height, in_width, out_height,
             out_width, pad_top, pad_left, out_data);
       } else {
-        Pad2DConstNHWC<T><<<grid, block, 0, stream>>>(
+        hipLaunchKernelGGL((Pad2DConstNHWC<T>), dim3(grid), dim3(block), 0, stream,
             out_size, in_data, num, channels, in_height, in_width, out_height,
             out_width, pad_top, pad_left, value, out_data);
       }
@@ -387,16 +388,16 @@ class Pad2dGradCUDAKernel : public framework::OpKernel<T> {
       const int out_height = d_out_dims[2];
       const int out_width = d_out_dims[3];
       if (mode == "reflect") {
-        Pad2DGradReflectNCHW<T><<<grid, block, 0, stream>>>(
+        hipLaunchKernelGGL((Pad2DGradReflectNCHW<T>), dim3(grid), dim3(block), 0, stream,
             out_size, d_in_data, num, channels, in_height, in_width, out_height,
             out_width, pad_top, pad_left, d_out_data);
       } else if (mode == "edge") {
-        Pad2DGradEdgeNCHW<T><<<grid, block, 0, stream>>>(
+        hipLaunchKernelGGL((Pad2DGradEdgeNCHW<T>), dim3(grid), dim3(block), 0, stream,
             out_size, d_in_data, num, channels, in_height, in_width, out_height,
             out_width, pad_top, pad_left, d_out_data);
       } else {
         grid = (in_size + block - 1) / block;
-        Pad2DGradConstNCHW<T><<<grid, block, 0, stream>>>(
+        hipLaunchKernelGGL((Pad2DGradConstNCHW<T>), dim3(grid), dim3(block), 0, stream,
             in_size, d_in_data, num, channels, in_height, in_width, out_height,
             out_width, pad_top, pad_left, d_out_data);
       }
@@ -407,16 +408,16 @@ class Pad2dGradCUDAKernel : public framework::OpKernel<T> {
       const int out_height = d_out_dims[1];
       const int out_width = d_out_dims[2];
       if (mode == "reflect") {
-        Pad2DGradReflectNHWC<T><<<grid, block, 0, stream>>>(
+        hipLaunchKernelGGL((Pad2DGradReflectNHWC<T>), dim3(grid), dim3(block), 0, stream,
             out_size, d_in_data, num, channels, in_height, in_width, out_height,
             out_width, pad_top, pad_left, d_out_data);
       } else if (mode == "edge") {
-        Pad2DGradEdgeNHWC<T><<<grid, block, 0, stream>>>(
+        hipLaunchKernelGGL((Pad2DGradEdgeNHWC<T>), dim3(grid), dim3(block), 0, stream,
             out_size, d_in_data, num, channels, in_height, in_width, out_height,
             out_width, pad_top, pad_left, d_out_data);
       } else {
         grid = (in_size + block - 1) / block;
-        Pad2DGradConstNHWC<T><<<grid, block, 0, stream>>>(
+        hipLaunchKernelGGL((Pad2DGradConstNHWC<T>), dim3(grid), dim3(block), 0, stream,
             in_size, d_in_data, num, channels, in_height, in_width, out_height,
             out_width, pad_top, pad_left, d_out_data);
       }

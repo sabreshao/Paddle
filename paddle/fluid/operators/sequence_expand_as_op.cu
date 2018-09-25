@@ -12,6 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
+#include "hip/hip_runtime.h"
 #include <algorithm>
 #include "paddle/fluid/operators/sequence_expand_as_op.h"
 #include "paddle/fluid/platform/cuda_primitives.h"
@@ -81,7 +82,7 @@ struct SequenceExpandFunctor<platform::CUDADeviceContext, T> {
 
     dim3 block_size(thread_x);
     dim3 grid_size(block_x);
-    sequence_expand_as_kernel<<<grid_size, block_size, 0, context.stream()>>>(
+    hipLaunchKernelGGL((sequence_expand_as_kernel<T>), dim3(grid_size), dim3(block_size), 0, context.stream(),
         x.data<T>(), ref_lod.CUDAData(context.GetPlace()), hight, width,
         out->mutable_data<T>(context.GetPlace()));
   }
@@ -107,8 +108,7 @@ struct SequenceExpandAsGradFunctor<platform::CUDADeviceContext, T> {
 
     dim3 block_size(thread_x);
     dim3 grid_size(block_x);
-    sequence_expand_as_grad_kernel<<<grid_size, block_size, 0,
-                                     context.stream()>>>(
+    hipLaunchKernelGGL((sequence_expand_as_grad_kernel<T>), dim3(grid_size), dim3(block_size), 0, context.stream(),
         dout.data<T>(), ref_lod.CUDAData(context.GetPlace()), hight, width,
         dx->mutable_data<T>(context.GetPlace()));
   }

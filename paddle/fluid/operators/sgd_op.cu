@@ -104,7 +104,7 @@ class SGDOpCUDAKernel : public framework::OpKernel<T> {
       int max_threads = ctx.cuda_device_context().GetMaxPhysicalThreadCount();
       int max_blocks = std::max(max_threads / kThreadsPerBlock, 1);
 
-      hipLaunchKernelGGL(SparseSGDFunctorKernel, dim3(max_blocks), dim3(thread_x), 0,
+      hipLaunchKernelGGL(SparseSGDFunctorKernel<T>, dim3(max_blocks), dim3(thread_x), 0,
           ctx.cuda_device_context().stream(),
           in_data, in_rows.CUDAData(ctx.GetPlace()), learning_rate->data<T>(),
           out_data, in_row_numel, in_rows.size());

@@ -15,7 +15,13 @@ limitations under the License. */
 #include <stdio.h>
 #include <string>
 #include <vector>
+#if defined(PADDLE_WITH_CUDA)
 #include "cub/cub.cuh"
+#elif defined(PADDLE_WITH_HIP)
+#include "hip/hip_runtime.h"
+#include <hipcub/hipcub.hpp>
+namespace cub = ::hipcub;
+#endif
 #include "paddle/fluid/framework/op_registry.h"
 #include "paddle/fluid/memory/memory.h"
 #include "paddle/fluid/operators/gather.cu.h"
