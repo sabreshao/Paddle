@@ -140,6 +140,10 @@ CUDNN_DNN_ROUTINE_EACH_AFTER_R4(DECLARE_DYNAMIC_LOAD_CUDNN_WRAP)
   __macro(miopenGetActivationDescriptor);    \
   __macro(miopenDestroyActivationDescriptor);
 CUDNN_DNN_ROUTINE_EACH_R5(DECLARE_DYNAMIC_LOAD_CUDNN_WRAP)
+
+#define CUDNN_DNN_ROUTINE_EACH_R7(__macro) \
+  __macro(miopenSetConvolutionGroupCount);
+CUDNN_DNN_ROUTINE_EACH_R7(DECLARE_DYNAMIC_LOAD_CUDNN_WRAP)
 }  // namespace dynload
 }  // namespace platform
 }  // namespace paddle

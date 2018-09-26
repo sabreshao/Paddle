@@ -73,6 +73,12 @@ class CUDNNConvOpKernel : public framework::OpKernel<T> {
     miopenConvolutionDescriptor_t cudnn_conv_desc =
         conv_desc.descriptor<T>(paddings, strides, dilations);
 
+#if 1
+    PADDLE_ENFORCE(platform::dynload::miopenSetConvolutionGroupCount(	
+            cudnn_conv_desc, groups));
+    groups = 1;
+#endif
+
     miopenTensorDescriptor_t cudnn_input_desc = input_desc.descriptor<T>(
         layout, framework::vectorize2int(input->dims()), groups);
     miopenTensorDescriptor_t cudnn_output_desc = output_desc.descriptor<T>(
@@ -189,11 +195,8 @@ class CUDNNConvGradOpKernel : public framework::OpKernel<T> {
     miopenConvolutionDescriptor_t cudnn_conv_desc =
         conv_desc.descriptor<T>(paddings, strides, dilations);
 
-#if 0
-    // cudnn 7 can support groups, no need to do it mannually
-    // FIXME(typhoonzero): find a better way to disable groups
-    // rather than setting it to 1.
-    CUDNN_ENFORCE(platform::dynload::cudnnSetConvolutionGroupCount(
+#if 1
+    PADDLE_ENFORCE(platform::dynload::miopenSetConvolutionGroupCount(
         cudnn_conv_desc, groups));
     groups = 1;
 #endif
