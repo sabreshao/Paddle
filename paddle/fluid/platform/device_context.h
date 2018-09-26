@@ -38,7 +38,7 @@ limitations under the License. */
 #include "glog/logging.h"
 #include "paddle/fluid/platform/enforce.h"
 #include "paddle/fluid/platform/place.h"
-#ifdef PADDLE_WITH_CUDA
+#if defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP)
 #include "paddle/fluid/platform/stream_callback_manager.h"
 #endif
 #include "unsupported/Eigen/CXX11/Tensor"
@@ -210,6 +210,17 @@ class CUDADeviceContext : public DeviceContext {
     std::lock_guard<std::recursive_mutex> guard(mutex_);
     callback();
     PADDLE_ENFORCE(hipEventRecord(ev, stream_));
+  }
+
+  template <typename Callback>
+  void AddStreamCallback(Callback&& callback) const {
+    std::lock_guard<std::mutex> guard(callback_mtx_);
+    callback_manager_->AddCallback(callback);
+  }
+
+  void WaitStreamCallback() const {
+    std::lock_guard<std::mutex> guard(callback_mtx_);
+    callback_manager_->Wait();
   }
 
  private:
