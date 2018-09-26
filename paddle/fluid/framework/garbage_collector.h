@@ -159,5 +159,70 @@ class StreamGarbageCollector : public GarbageCollector<T> {
 };
 #endif
 
+#ifdef PADDLE_WITH_HIP
+template <typename T>
+class DefaultStreamGarbageCollector : public GarbageCollector<T> {
+ public:
+  DefaultStreamGarbageCollector(const platform::CUDAPlace &place,
+                                size_t max_memory_size)
+      : GarbageCollector<T>(place, max_memory_size) {}
+
+  hipStream_t stream() const {
+    return static_cast<const platform::CUDADeviceContext *>(this->dev_ctx_)
+        ->stream();
+  }
+
+  void Wait() const override {
+    this->dev_ctx_->Wait();
+    static_cast<const platform::CUDADeviceContext *>(this->dev_ctx_)
+        ->WaitStreamCallback();
+  }
+
+ protected:
+  void ClearCallback(const std::function<void()> &callback) override {
+    static_cast<platform::CUDADeviceContext *>(this->dev_ctx_)
+        ->AddStreamCallback(callback);
+  }
+};
+
+template <typename T>
+class StreamGarbageCollector : public GarbageCollector<T> {
+ public:
+  StreamGarbageCollector(const platform::CUDAPlace &place,
+                         size_t max_memory_size)
+      : GarbageCollector<T>(place, max_memory_size) {
+    PADDLE_ENFORCE(hipSetDevice(place.device));
+    PADDLE_ENFORCE(hipStreamCreate(&stream_));
+    callback_manager_.reset(new platform::StreamCallbackManager(stream_));
+  }
+
+  ~StreamGarbageCollector() {
+    auto place = boost::get<platform::CUDAPlace>(this->dev_ctx_->GetPlace());
+    PADDLE_ENFORCE(hipSetDevice(place.device));
+    PADDLE_ENFORCE(hipStreamSynchronize(stream_));
+    PADDLE_ENFORCE(hipStreamDestroy(stream_));
+  }
+
+  void Wait() const override {
+    PADDLE_ENFORCE(hipStreamSynchronize(stream_));
+    std::lock_guard<std::mutex> guard(this->mutex_);
+    callback_manager_->Wait();
+  }
+
+  hipStream_t stream() const { return stream_; }
+
+ protected:
+  void ClearCallback(const std::function<void()> &callback) override {
+    std::lock_guard<std::mutex> guard(this->mutex_);
+    callback_manager_->AddCallback(callback);
+  }
+
+ private:
+  hipStream_t stream_;
+  std::unique_ptr<platform::StreamCallbackManager> callback_manager_;
+};
+#endif
+
+
 }  // namespace framework
 }  // namespace paddle

@@ -51,8 +51,13 @@ class ReferenceCountOpHandle : public OpHandleBase {
     dev_ctx_ = static_cast<platform::CUDADeviceContext *>(
         platform::DeviceContextPool::Instance().Get(place));
     if (IsStreamGarabageCollector()) {
+#ifdef PADDLE_WITH_CUDA
       PADDLE_ENFORCE(cudaSetDevice(place.device));
       PADDLE_ENFORCE(cudaEventCreateWithFlags(&event_, cudaEventDisableTiming));
+#elif PADDLE_WITH_HIP
+      PADDLE_ENFORCE(hipSetDevice(place.device));
+      PADDLE_ENFORCE(hipEventCreateWithFlags(&event_, hipEventDisableTiming));
+#endif
     }
 
     for (auto &name : var_names) AddVar(name);
@@ -61,8 +66,13 @@ class ReferenceCountOpHandle : public OpHandleBase {
   ~ReferenceCountOpHandle() {
     if (IsStreamGarabageCollector()) {
       auto gpu_place = boost::get<platform::CUDAPlace>(dev_ctx_->GetPlace());
+#ifdef PADDLE_WITH_CUDA
       PADDLE_ENFORCE(cudaSetDevice(gpu_place.device));
       PADDLE_ENFORCE(cudaEventDestroy(event_));
+#elif PADDLE_WITH_HIP
+      PADDLE_ENFORCE(hipSetDevice(gpu_place.device));
+      PADDLE_ENFORCE(hipEventDestroy(event_));
+#endif
     }
   }
 
@@ -112,8 +122,13 @@ class ReferenceCountOpHandle : public OpHandleBase {
       auto compute_stream = dev_ctx_->stream();
       auto callback_stream = gc->stream();
       auto callback_func = [=]() {
+#ifdef PADDLE_WITH_CUDA
         PADDLE_ENFORCE(cudaEventRecord(event_, compute_stream));
         PADDLE_ENFORCE(cudaStreamWaitEvent(callback_stream, event_, 0));
+#elif PADDLE_WITH_HIP
+        PADDLE_ENFORCE(hipEventRecord(event_, compute_stream));
+        PADDLE_ENFORCE(hipStreamWaitEvent(callback_stream, event_, 0));
+#endif
       };
       gc_->Add(tensors, callback_func);
     } else {
@@ -130,7 +145,11 @@ class ReferenceCountOpHandle : public OpHandleBase {
   std::unordered_map<std::string, int> var_names_;
   GarbageCollector<Tensor> *gc_;       // not own
   AtomicReferenceCountMap *ref_cnts_;  // not own
+#ifdef PADDLE_WITH_CUDA
   cudaEvent_t event_;
+#elif PADDLE_WITH_HIP
+  hipEvent_t event_;
+#endif
 };
 
 }  // namespace details

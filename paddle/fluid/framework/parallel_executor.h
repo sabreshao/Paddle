@@ -29,7 +29,7 @@ limitations under the License. */
 #include "paddle/fluid/framework/tensor.h"
 #include "paddle/fluid/platform/device_context.h"
 
-#ifdef PADDLE_WITH_CUDA
+#if (defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP))
 #include "paddle/fluid/framework/details/reference_count_pass.h"
 #endif
 
@@ -77,7 +77,7 @@ class ParallelExecutor {
 
   ParallelExecutorPrivate *member_;
 
-#ifdef PADDLE_WITH_CUDA
+#if (defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP))
   // ref_cnts_ is only initialized when ParallelExecutor constructs, and then
   // keeps unchanged
   // Before each iteration, cur_ref_cnts_ is reset to ref_cnts_
