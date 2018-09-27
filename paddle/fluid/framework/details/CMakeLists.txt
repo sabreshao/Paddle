@@ -17,7 +17,7 @@ if(WITH_GPU)
     nv_library(reduce_op_handle SRCS reduce_op_handle.cc DEPS op_handle_base variable_visitor scope ddim dynload_cuda)
     nv_library(broadcast_op_handle SRCS broadcast_op_handle.cc DEPS op_handle_base scope ddim memory variable_visitor dynload_cuda)
 elseif(WITH_AMD_GPU)
-    hip_library(all_reduce_op_handle SRCS all_reduce_op_handle.cc DEPS op_handle_base scope lod_tensor ddim memory
+    hip_library(all_reduce_op_handle SRCS all_reduce_op_handle.cu DEPS op_handle_base scope lod_tensor ddim memory
         dynload_hip variable_visitor)
     hip_library(reduce_op_handle SRCS reduce_op_handle.cc DEPS op_handle_base variable_visitor scope ddim dynload_hip)
     hip_library(broadcast_op_handle SRCS broadcast_op_handle.cc DEPS op_handle_base scope ddim memory variable_visitor dynload_hip)
