@@ -65,15 +65,20 @@ class CUDNNConvTransposeOpKernel : public framework::OpKernel<T> {
 
     // (N, M, H, W) or (N, M, D, H, W)
     miopenTensorDescriptor_t cudnn_input_desc = input_desc.descriptor<T>(
-        layout, framework::vectorize2int(input->dims()));
+        layout, framework::vectorize2int(input->dims()), 1);
     // (N, C, O_h, O_w) or (N, C, O_d, O_h, O_w)
     miopenTensorDescriptor_t cudnn_output_desc = output_desc.descriptor<T>(
-        layout, framework::vectorize2int(output->dims()));
+        layout, framework::vectorize2int(output->dims()), 1);
     // (M, C, K_h, K_w) or (M, C, K_d, K_h, K_w)
     miopenTensorDescriptor_t cudnn_filter_desc = filter_desc.descriptor<T>(
-        layout, framework::vectorize2int(filter->dims()));
+        layout, framework::vectorize2int(filter->dims()), 1);
     miopenConvolutionDescriptor_t cudnn_conv_desc =
         conv_desc.descriptor<T>(paddings, strides, dilations);
+
+    // must set group count
+    PADDLE_ENFORCE(platform::dynload::miopenSetConvolutionGroupCount(	
+            cudnn_conv_desc, groups));
+    groups = 1;
 
     // ------------------- cudnn conv workspace ---------------------
     void* cudnn_workspace = nullptr;
@@ -89,12 +94,6 @@ class CUDNNConvTransposeOpKernel : public framework::OpKernel<T> {
     miopenConvAlgoPerf_t perfRes;
     int algoCount = 0;
     // Get the algorithm
-    PADDLE_ENFORCE(platform::dynload::miopenFindConvolutionBackwardDataAlgorithm(
-        handle, cudnn_input_desc, input_data,cudnn_filter_desc, filter_data, cudnn_conv_desc,
-        // dxDesc: Handle to the previously initialized output tensor
-        // descriptor.
-        cudnn_output_desc, output_data,1,&algoCount, &perfRes, cudnn_workspace,workspace_size_in_bytes,false));
-    algo=perfRes.bwd_data_algo;
     // get workspace size able to allocate
     PADDLE_ENFORCE(
         platform::dynload::miopenConvolutionBackwardDataGetWorkSpaceSize(
@@ -111,6 +110,13 @@ class CUDNNConvTransposeOpKernel : public framework::OpKernel<T> {
     int filter_offset = filter->numel() / groups;
     T alpha = 1.0f, beta = 0.0f;
     for (int g = 0; g < groups; g++) {
+      // miopenFindConvolutionBackwardDataAlgorithm() must called after the workspace have allocated
+      PADDLE_ENFORCE(platform::dynload::miopenFindConvolutionBackwardDataAlgorithm(
+          handle, cudnn_input_desc, input_data,cudnn_filter_desc, filter_data, cudnn_conv_desc,
+          // dxDesc: Handle to the previously initialized output tensor
+          // descriptor.
+          cudnn_output_desc, output_data,1,&algoCount, &perfRes, cudnn_workspace,workspace_size_in_bytes,false));
+      algo=perfRes.bwd_data_algo;
       PADDLE_ENFORCE(platform::dynload::miopenConvolutionBackwardData(
           handle, &alpha, cudnn_input_desc, input_data + input_offset * g,
           cudnn_filter_desc, filter_data + filter_offset * g,
@@ -155,16 +161,21 @@ class CUDNNConvTransposeGradOpKernel : public framework::OpKernel<T> {
 
     // Input: (N, M, H, W) or (N, M, D, H, W)
     miopenTensorDescriptor_t cudnn_input_desc = input_desc.descriptor<T>(
-        layout, framework::vectorize2int(input->dims()));
+        layout, framework::vectorize2int(input->dims()), 1);
     // Output: (N, C, O_h, O_w) or (N, C, O_d, O_h, O_w)
     miopenTensorDescriptor_t cudnn_output_desc = output_desc.descriptor<T>(
-        layout, framework::vectorize2int(output_grad->dims()));
+        layout, framework::vectorize2int(output_grad->dims()), 1);
     // Filter (M, C, K_h, K_w) or (M, C, K_d K_h, K_w)
     miopenTensorDescriptor_t cudnn_filter_desc = filter_desc.descriptor<T>(
-        layout, framework::vectorize2int(filter->dims()));
+        layout, framework::vectorize2int(filter->dims()), 1);
 
     miopenConvolutionDescriptor_t cudnn_conv_desc =
         conv_desc.descriptor<T>(paddings, strides, dilations);
+
+    // must set group count
+    PADDLE_ENFORCE(platform::dynload::miopenSetConvolutionGroupCount(	
+            cudnn_conv_desc, groups));
+    groups = 1;
 
     // ------------------- cudnn backward algorithm ---------------------
     miopenConvFwdAlgorithm_t data_algo = miopenConvolutionFwdAlgoGEMM;
@@ -184,11 +195,6 @@ class CUDNNConvTransposeGradOpKernel : public framework::OpKernel<T> {
     int algoCount = 0;
     if (input_grad) {
       // choose backward algorithm for data
-      PADDLE_ENFORCE(platform::dynload::miopenFindConvolutionForwardAlgorithm(
-          handle, cudnn_output_desc, (const void*)output_grad_data, cudnn_filter_desc, 
-          (const void*)filter_data,cudnn_conv_desc, cudnn_input_desc, (void*)input_data,
-          1, &algoCount, &perfRes, (void*)cudnn_workspace, workspace_size_in_bytes, false));
-      data_algo=perfRes.fwd_algo;
       PADDLE_ENFORCE(platform::dynload::miopenConvolutionForwardGetWorkSpaceSize(
           handle, cudnn_output_desc, cudnn_filter_desc, cudnn_conv_desc,
           cudnn_input_desc, &fwd_ws_size));
@@ -204,17 +210,6 @@ class CUDNNConvTransposeGradOpKernel : public framework::OpKernel<T> {
               cudnn_conv_desc, cudnn_input_desc, (void*)input_data, 1, &algoCount,
 	      &perfRes, (void*)cudnn_workspace,workspace_size_in_bytes,false));
       #endif
-      PADDLE_ENFORCE(
-          platform::dynload::miopenFindConvolutionBackwardWeightsAlgorithm(
-            handle,
-            cudnn_input_desc, (const void*)input_data,
-            cudnn_output_desc, (const void*)output_grad_data,
-            cudnn_conv_desc,
-            cudnn_filter_desc, (void*)filter_data,
-            1, &algoCount, &perfRes,
-            (void*)cudnn_workspace, workspace_size_in_bytes, false));
-
-      filter_algo=perfRes.bwd_weights_algo;
       // get workspace for backwards filter algorithm
       PADDLE_ENFORCE(
           platform::dynload::miopenConvolutionBackwardWeightsGetWorkSpaceSize(
@@ -239,6 +234,12 @@ class CUDNNConvTransposeGradOpKernel : public framework::OpKernel<T> {
       T* input_grad_data = input_grad->mutable_data<T>(ctx.GetPlace());
       // Because beta is zero, it is unnecessary to reset input_grad.
       for (int g = 0; g < groups; g++) {
+        // miopenFindConvolutionForwardAlgorithm() must be called after workspace have allocated
+        PADDLE_ENFORCE(platform::dynload::miopenFindConvolutionForwardAlgorithm(
+            handle, cudnn_output_desc, (const void*)output_grad_data, cudnn_filter_desc, 
+            (const void*)filter_data,cudnn_conv_desc, cudnn_input_desc, (void*)input_data,
+            1, &algoCount, &perfRes, (void*)cudnn_workspace, workspace_size_in_bytes, false));
+        data_algo=perfRes.fwd_algo;
         PADDLE_ENFORCE(platform::dynload::miopenConvolutionForward(
             handle, &alpha, cudnn_output_desc, output_grad_data + output_grad_offset * g,
             cudnn_filter_desc, filter_data + filter_offset * g, cudnn_conv_desc, data_algo,
@@ -253,6 +254,18 @@ class CUDNNConvTransposeGradOpKernel : public framework::OpKernel<T> {
       // Because beta is zero, it is unnecessary to reset filter_grad.
       // Gradient with respect to the filter
       for (int g = 0; g < groups; g++) {
+        // miopenFindConvolutionBackwardWeightsAlgorithm() must be called after workspace have allocated
+        PADDLE_ENFORCE(
+          platform::dynload::miopenFindConvolutionBackwardWeightsAlgorithm(
+            handle,
+            cudnn_input_desc, (const void*)input_data,
+            cudnn_output_desc, (const void*)output_grad_data,
+            cudnn_conv_desc,
+            cudnn_filter_desc, (void*)filter_data,
+            1, &algoCount, &perfRes,
+            (void*)cudnn_workspace, workspace_size_in_bytes, false));
+
+        filter_algo=perfRes.bwd_weights_algo;
         PADDLE_ENFORCE(platform::dynload::miopenConvolutionBackwardWeights(
             handle, &alpha, cudnn_input_desc, input_data + input_offset * g,
             cudnn_output_desc, output_grad_data + output_grad_offset * g,
