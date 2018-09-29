@@ -36,16 +36,16 @@ __inline__ __device__ T warpReduceSum(T val) {
 #endif
 }
 __forceinline__ __device__ unsigned lane_id() {
-  unsigned ret;
-  asm volatile("mov.u32 %0, %laneid;" : "=r"(ret));
-  return ret;
+  return __lane_id();
 }
 
+#if 0
 __forceinline__ __device__ unsigned warp_id() {
   unsigned ret;
   asm volatile("mov.u32 %0, %warpid;" : "=r"(ret));
   return ret;
 }
+#endif
 
 // A Cuda kernel to compute the depthwise convolution forward pass
 // in NCHW format.
