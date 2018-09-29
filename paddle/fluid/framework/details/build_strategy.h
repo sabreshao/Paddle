@@ -25,6 +25,8 @@
 
 #ifdef PADDLE_WITH_CUDA
 #include "paddle/fluid/platform/nccl_helper.h"
+#elif defined(PADDLE_WITH_HIP)
+#include "paddle/fluid/platform/rccl_helper.h"
 #endif
 
 namespace paddle {
@@ -84,7 +86,7 @@ struct BuildStrategy {
       const std::string &loss_var_name,
       const std::unordered_set<std::string> &param_names,
       const std::vector<Scope *> &local_scopes,
-#ifdef PADDLE_WITH_CUDA
+#if (defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP))
       const bool use_cuda, platform::NCCLContextMap *nccl_ctxs) const;
 #else
       const bool use_cuda) const;
