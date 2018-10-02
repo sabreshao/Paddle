@@ -288,6 +288,7 @@ CUDADeviceContext::CUDADeviceContext(CUDAPlace place) : place_(place) {
   } else {
     miopen_handle_ = nullptr;
   }
+  hiprand_generator = nullptr;
 }
 
 CUDADeviceContext::~CUDADeviceContext() {
@@ -300,6 +301,9 @@ CUDADeviceContext::~CUDADeviceContext() {
   eigen_stream_.reset();
   eigen_device_.reset();
   PADDLE_ENFORCE(hipStreamDestroy(stream_));
+  if( hiprand_generator != nullptr ){
+    PADDLE_ENFORCE(dynload::hiprandDestroyGenerator(hiprand_generator));
+  }
 }
 
 Place CUDADeviceContext::GetPlace() const { return place_; }
@@ -329,6 +333,13 @@ hipblasHandle_t CUDADeviceContext::hipblas_handle() const {
 miopenHandle_t CUDADeviceContext::miopen_handle() const { return miopen_handle_; }
 
 hipStream_t CUDADeviceContext::stream() const { return stream_; }
+
+hiprandGenerator_t CUDADeviceContext::rand_generator() const {
+  if( hiprand_generator == nullptr ){
+    PADDLE_ENFORCE(dynload::hiprandCreateGenerator((hiprandGenerator_t *)&hiprand_generator, HIPRAND_RNG_PSEUDO_DEFAULT));
+  }
+  return hiprand_generator;
+}
 
 CUDAPinnedDeviceContext::CUDAPinnedDeviceContext() {
   eigen_device_.reset(new Eigen::DefaultDevice());
