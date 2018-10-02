@@ -95,6 +95,7 @@ void AllReduceOpHandle::RunImpl() {
         auto stream = nccl_ctx.stream();
         auto comm = nccl_ctx.comm_;
 #ifdef PADDLE_WITH_HIP
+        stream = static_cast<platform::CUDADeviceContext *>(dev_ctxes_[p])->stream();
         all_reduce_calls.emplace_back([=] {
           PADDLE_ENFORCE(platform::dynload::rcclAllReduce(
               buffer, buffer, numel, static_cast<rcclDataType_t>(dtype),
