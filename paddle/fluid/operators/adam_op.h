@@ -295,14 +295,14 @@ class AdamOpKernel : public framework::OpKernel<T> {
       int64_t* rows = nullptr;
 // When compiled without CUDA, the CUDAMutableData() interface should not be
 // provided.
-#if defined(PADDLE_WITH_CUDA)
+#if defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP)
       if (platform::is_gpu_place(ctx.GetPlace())) {
         rows = grad_merge.mutable_rows()->CUDAMutableData(ctx.GetPlace());
       } else {
 #endif
         rows = grad_merge.mutable_rows()->data();
 
-#if defined(PADDLE_WITH_CUDA)
+#if defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP)
       }
 #endif
       auto row_numel = grad_tensor.numel() / grad_merge.rows().size();
