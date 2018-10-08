@@ -188,9 +188,11 @@ namespace ops = paddle::operators;
 namespace plat = paddle::platform;
 
 REGISTER_OP_KERNEL(pool2d, CUDNN, plat::CUDAPlace,
-                   ops::PoolCUDNNOpKernel<float>);
+                   ops::PoolCUDNNOpKernel<float>,
+                   ops::PoolCUDNNOpKernel<plat::float16>);
 REGISTER_OP_KERNEL(pool2d_grad, CUDNN, plat::CUDAPlace,
-                   ops::PoolCUDNNGradOpKernel<float>);
+                   ops::PoolCUDNNGradOpKernel<float>,
+                   ops::PoolCUDNNGradOpKernel<plat::float16>);
 
 REGISTER_OP_KERNEL(pool3d, CUDNN, plat::CUDAPlace,
                    ops::PoolCUDNNOpKernel<float>);
