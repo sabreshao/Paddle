@@ -48,7 +48,9 @@ void FetchOpHandle::WaitAndMergeCPUTensors() const {
 }
 
 void FetchOpHandle::RunImpl() {
+#ifndef PADDLE_WITH_HIP
   WaitInputVarGenerated(platform::CPUPlace());
+#endif
 
   tensors_.resize(inputs_.size());
   platform::CPUPlace cpu;
@@ -65,8 +67,10 @@ void FetchOpHandle::RunImpl() {
 
     auto &t = var->Get<framework::LoDTensor>();
     if (platform::is_gpu_place(t.place())) {
-#if (defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP))
+#ifdef PADDLE_WITH_CUDA
       TensorCopySync(t, cpu, &tensors_[i]);
+#elif defined(PADDLE_WITH_HIP)
+      TensorCopy(t, cpu, &tensors_[i]);
 #endif
     } else {
       tensors_[i].ShareDataWith(t);

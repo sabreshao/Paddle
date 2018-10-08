@@ -26,6 +26,7 @@ limitations under the License. */
 #endif
 #ifdef PADDLE_WITH_HIP
 #include "paddle/fluid/platform/rccl_helper.h"
+#define USE_MEM_COPY 1
 #endif
 
 #include "paddle/fluid/framework/details/multi_devices_graph_check_pass.h"
@@ -246,12 +247,16 @@ void ParallelExecutor::BCastParamsToDevices(
     if (paddle::platform::is_gpu_place(main_tensor.place())) {
 #if (defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP))
       std::vector<void *> buffers;
+#ifndef USE_MEM_COPY
       size_t numel = main_tensor.numel();
+#endif
 #ifdef PADDLE_WITH_CUDA
       ncclDataType_t data_type = platform::ToNCCLDataType(main_tensor.type());
 #endif
 #ifdef PADDLE_WITH_HIP
+#ifndef USE_MEM_COPY
       rcclDataType_t data_type = platform::ToNCCLDataType(main_tensor.type());
+#endif
 #endif
       for (size_t i = 0; i < member_->places_.size(); ++i) {
         auto place = member_->places_[i];
@@ -259,12 +264,19 @@ void ParallelExecutor::BCastParamsToDevices(
 
         if ((initializing && i == 0) ||
             (!initializing && static_cast<int>(i) == var_dev_id)) {
+#ifndef USE_MEM_COPY
           buffer = const_cast<void *>(main_tensor.data<void>());
+#endif
         } else {
           auto local_scope = member_->local_scopes_[i];
           auto *t = local_scope->Var(var)->GetMutable<LoDTensor>();
           t->Resize(dims);
+#ifdef USE_MEM_COPY
+          t->mutable_data(place, main_tensor.type());
+          framework::TensorCopy(main_tensor, place, t);
+#else
           buffer = t->mutable_data(place, main_tensor.type());
+#endif
         }
         buffers.push_back(buffer);
       }
@@ -289,6 +301,7 @@ void ParallelExecutor::BCastParamsToDevices(
         }
 #endif
 #ifdef PADDLE_WITH_HIP
+#ifndef USE_MEM_COPY
         for (size_t i = 0; i < member_->places_.size(); ++i) {
           auto &nccl_ctx = member_->nccl_ctxs_->at(member_->places_[i]);
           if (initializing) {
@@ -302,6 +315,7 @@ void ParallelExecutor::BCastParamsToDevices(
             }
           }
         }
+#endif
 #endif
         member_->nccl_ctxs_->WaitAll();
       }

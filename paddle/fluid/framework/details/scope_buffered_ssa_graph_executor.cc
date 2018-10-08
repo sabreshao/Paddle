@@ -69,9 +69,11 @@ FeedFetchList ScopeBufferedSSAGraphExecutor::Run(
       drop_scope_counter_ == strategy_.num_iteration_per_drop_scope_) {
     drop_scope_counter_ = 0;
     // Wait All computational streams
+#ifndef PADDLE_WITH_HIP
     for (auto p : places_) {
       platform::DeviceContextPool::Instance().Get(p)->Wait();
     }
+#endif
     for (auto &scope : local_scopes_) {
       auto &local_scope =
           *scope->Var(details::kLocalExecScopeName)->GetMutable<Scope *>();
