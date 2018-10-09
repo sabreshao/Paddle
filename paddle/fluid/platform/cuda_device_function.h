@@ -16,48 +16,31 @@ limitations under the License. */
 
 #include "hip/hip_fp16.h"
 #include "hip/hip_runtime.h"
-#include "paddle/fluid/platform/float16.h"
 
 namespace paddle {
 namespace platform {
 
 #define CREATE_SHFL_MASK(mask, predicate) mask = 0u;
 
-static __forceinline__ __device__ float CudaShuffleDownSync(unsigned mask, float val,
+template <typename T>
+static __forceinline__ __device__ T CudaShuffleDownSync(unsigned mask, T val,
                                                  int delta, int width = 32) {
   return __shfl_down(val, delta, width);
 }
 
-static __forceinline__ __device__ float CudaShuffleSync(unsigned mask, float val, int src_line,
+template <typename T>
+static __forceinline__ __device__ T CudaShuffleSync(unsigned mask, T val, int src_line,
                                              int width = 32) {
   return __shfl(val, src_line, width);
 }
 
-static __forceinline__ __device__ int CudaShuffleDownSync(unsigned mask, int val,
-                                                 int delta, int width) {
-  return __shfl_down(val, delta, width);
-}
-
-static __forceinline__ __device__ int CudaShuffleSync(unsigned mask, int val, int src_line,
-                                             int width) {
-  return __shfl(val, src_line, width);
-}
-
-static __forceinline__ __device__ paddle::platform::float16 CudaShuffleDownSync(unsigned mask, paddle::platform::float16 val,
-                                                 int delta, int width) {
-  return (float)__shfl_down((float)val, delta, width);
-}
-
-static __forceinline__ __device__ paddle::platform::float16 CudaShuffleSync(unsigned mask, paddle::platform::float16 val, int src_line,
-                                             int width) {
-  return (float)__shfl((float)val, src_line, width);
-}
-
+template <>
 static __forceinline__ __device__ double CudaShuffleDownSync(unsigned mask, double val,
                                                  int delta, int width) {
   return (float)__shfl_down((float)val, delta, width);
 }
 
+template <>
 static __forceinline__ __device__ double CudaShuffleSync(unsigned mask, double val, int src_line,
                                              int width) {
   return (float)__shfl((float)val, src_line, width);
