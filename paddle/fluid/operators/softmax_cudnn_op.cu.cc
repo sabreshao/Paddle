@@ -75,6 +75,8 @@ class SoftmaxGradCUDNNKernel : public framework::OpKernel<T> {
 namespace ops = paddle::operators;
 namespace plat = paddle::platform;
 REGISTER_OP_KERNEL(softmax, CUDNN, plat::CUDAPlace,
-                   ops::SoftmaxCUDNNKernel<float>);
+                   ops::SoftmaxCUDNNKernel<float>,
+                   ops::SoftmaxCUDNNKernel<plat::float16>);
 REGISTER_OP_KERNEL(softmax_grad, CUDNN, plat::CUDAPlace,
-                   ops::SoftmaxGradCUDNNKernel<float>);
+                   ops::SoftmaxGradCUDNNKernel<float>,
+                   ops::SoftmaxCUDNNKernel<plat::float16>);

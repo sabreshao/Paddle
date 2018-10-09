@@ -326,7 +326,8 @@ class CUDNNConvGradOpKernel : public framework::OpKernel<T> {
 
 namespace plat = paddle::platform;
 REGISTER_OP_KERNEL(conv2d, CUDNN, plat::CUDAPlace,
-                   paddle::operators::CUDNNConvOpKernel<float>);
+                   paddle::operators::CUDNNConvOpKernel<float>,
+                   paddle::operators::CUDNNConvOpKernel<plat::float16>);
 REGISTER_OP_KERNEL(conv2d_grad, CUDNN, plat::CUDAPlace,
                    paddle::operators::CUDNNConvGradOpKernel<float>);
 
