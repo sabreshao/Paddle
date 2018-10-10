@@ -12,4 +12,6 @@ endif(NOT WIN32)
 # NOTE: please add subdirectory inference at last.
 add_subdirectory(inference)
 
-add_subdirectory(train)
+if (NOT WITH_AMD_GPU)
+  add_subdirectory(train)
+endif (NOT WITH_AMD_GPU)
