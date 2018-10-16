@@ -12,30 +12,18 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-#pragma once
+#include "paddle/fluid/platform/dynload/hiprand.h"
 
 namespace paddle {
 namespace platform {
 namespace dynload {
 
-#ifndef _WIN32
-#define DECLARE_TYPE(__name, ...) decltype(__name(__VA_ARGS__))
-#else
-#define DECLARE_TYPE(__name, ...) decltype(auto)
-#endif
+std::once_flag hiprand_dso_flag;
+void *hiprand_dso_handle;
 
-void* GetCublasDsoHandle();
-void* GetCUDNNDsoHandle();
-void* GetCUPTIDsoHandle();
-void* GetCurandDsoHandle();
-void* GetWarpCTCDsoHandle();
-void* GetNCCLDsoHandle();
-void* GetTensorRtDsoHandle();
-void* GetMKLMLDsoHandle();
-void* GetMIOpenDsoHandle();
-void* GetHipblasDsoHandle();
-void* GetHiprandDsoHandle();
-void* GetRCCLDsoHandle();
+#define DEFINE_WRAP(__name) DynLoad__##__name __name
+
+HIPRAND_RAND_ROUTINE_EACH(DEFINE_WRAP);
 
 }  // namespace dynload
 }  // namespace platform

@@ -12,30 +12,17 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-#pragma once
+#include "paddle/fluid/platform/dynload/hipblas.h"
 
 namespace paddle {
 namespace platform {
 namespace dynload {
+std::once_flag hipblas_dso_flag;
+void *hipblas_dso_handle = nullptr;
 
-#ifndef _WIN32
-#define DECLARE_TYPE(__name, ...) decltype(__name(__VA_ARGS__))
-#else
-#define DECLARE_TYPE(__name, ...) decltype(auto)
-#endif
+#define DEFINE_WRAP(__name) DynLoad__##__name __name
 
-void* GetCublasDsoHandle();
-void* GetCUDNNDsoHandle();
-void* GetCUPTIDsoHandle();
-void* GetCurandDsoHandle();
-void* GetWarpCTCDsoHandle();
-void* GetNCCLDsoHandle();
-void* GetTensorRtDsoHandle();
-void* GetMKLMLDsoHandle();
-void* GetMIOpenDsoHandle();
-void* GetHipblasDsoHandle();
-void* GetHiprandDsoHandle();
-void* GetRCCLDsoHandle();
+HIPBLAS_BLAS_ROUTINE_EACH(DEFINE_WRAP);
 
 }  // namespace dynload
 }  // namespace platform
