@@ -14,8 +14,9 @@
 
 #pragma once
 
-#include <hipblas.h>
-#include <dlfcn.h>
+#include <cublasXt.h>
+#include <cublas_v2.h>
+#include <cuda.h>
 #include <mutex>  // NOLINT
 #include <type_traits>
 #include "paddle/fluid/platform/dynload/dynamic_loader.h"
@@ -40,7 +41,7 @@ extern void *cublas_dso_handle;
   struct DynLoad__##__name {                                                 \
     using FUNC_TYPE = decltype(&::__name);                                   \
     template <typename... Args>                                              \
-    inline hipblasStatus_t operator()(Args... args) {                         \
+    inline cublasStatus_t operator()(Args... args) {                         \
       std::call_once(cublas_dso_flag, []() {                                 \
         cublas_dso_handle = paddle::platform::dynload::GetCublasDsoHandle(); \
       });                                                                    \
@@ -53,7 +54,7 @@ extern void *cublas_dso_handle;
 #define DECLARE_DYNAMIC_LOAD_CUBLAS_WRAP(__name)     \
   struct DynLoad__##__name {                         \
     template <typename... Args>                      \
-    inline hipblasStatus_t operator()(Args... args) { \
+    inline cublasStatus_t operator()(Args... args) { \
       return ::__name(args...);                      \
     }                                                \
   };                                                 \
@@ -64,30 +65,29 @@ extern void *cublas_dso_handle;
   DECLARE_DYNAMIC_LOAD_CUBLAS_WRAP(__name)
 
 #define CUBLAS_BLAS_ROUTINE_EACH(__macro) \
-  __macro(hipblasSaxpy);                \
-  __macro(hipblasDaxpy);                \
-  __macro(hipblasSgemv);                \
-  __macro(hipblasDgemv);                \
-  __macro(hipblasSgemm);                \
-  __macro(hipblasDgemm);                \
-  __macro(hipblasSgeam);                \
-  __macro(hipblasDgeam);                \
-  __macro(hipblasCreate);               \
-  __macro(hipblasDestroy);              \
-  __macro(hipblasSetStream);            \
-  __macro(hipblasSetPointerMode);       \
-  __macro(hipblasGetPointerMode);       \
-  __macro(hipblasSgemmBatched);            \
-  __macro(hipblasDgemmBatched);            \
-  __macro(hipblasCgemmBatched);            \
-  __macro(hipblasZgemmBatched);            \
-  __macro(hipblasSgemmStridedBatched);     \
-  __macro(hipblasDgemmStridedBatched);     \
-  __macro(hipblasCgemmStridedBatched);     \
-  __macro(hipblasZgemmStridedBatched);     \
-  __macro(hipblasDgetrfBatched);           \
-  __macro(hipblasDgetriBatched)
-
+  __macro(cublasSaxpy_v2);                \
+  __macro(cublasDaxpy_v2);                \
+  __macro(cublasSgemv_v2);                \
+  __macro(cublasDgemv_v2);                \
+  __macro(cublasSgemm_v2);                \
+  __macro(cublasDgemm_v2);                \
+  __macro(cublasHgemm);                   \
+  __macro(cublasSgemmEx);                 \
+  __macro(cublasSgeam);                   \
+  __macro(cublasDgeam);                   \
+  __macro(cublasCreate_v2);               \
+  __macro(cublasDestroy_v2);              \
+  __macro(cublasSetStream_v2);            \
+  __macro(cublasSetPointerMode_v2);       \
+  __macro(cublasGetPointerMode_v2);       \
+  __macro(cublasSgemmBatched);            \
+  __macro(cublasDgemmBatched);            \
+  __macro(cublasCgemmBatched);            \
+  __macro(cublasZgemmBatched);            \
+  __macro(cublasSgetrfBatched);           \
+  __macro(cublasSgetriBatched);           \
+  __macro(cublasDgetrfBatched);           \
+  __macro(cublasDgetriBatched);
 
 CUBLAS_BLAS_ROUTINE_EACH(DECLARE_DYNAMIC_LOAD_CUBLAS_WRAP)
 

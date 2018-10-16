@@ -17,7 +17,26 @@ limitations under the License. */
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
 
-#if defined(__HIP_DEVICE_COMPILE__) && !defined(NDEBUG)
+#if defined(__CUDA_ARCH__)
+#include <stdio.h>
+#define PADDLE_ASSERT(e)                                           \
+  do {                                                             \
+    if (!(e)) {                                                    \
+      printf("%s:%d Assertion `%s` failed.\n", __FILE__, __LINE__, \
+             TOSTRING(e));                                         \
+      asm("trap;");                                                \
+    }                                                              \
+  } while (0)
+
+#define PADDLE_ASSERT_MSG(e, m)                                         \
+  do {                                                                  \
+    if (!(e)) {                                                         \
+      printf("%s:%d Assertion `%s` failed (%s).\n", __FILE__, __LINE__, \
+             TOSTRING(e), m);                                           \
+      asm("trap;");                                                     \
+    }                                                                   \
+  } while (0)
+#elif defined(__HIP_DEVICE_COMPILE__) && !defined(NDEBUG)
 #include <stdio.h>
 #define PADDLE_ASSERT(e)                                           \
   do {                                                             \
@@ -32,7 +51,6 @@ limitations under the License. */
     if (!(e)) {                                                         \
       printf("%s:%d Assertion `%s` failed (%s).\n", __FILE__, __LINE__, \
              TOSTRING(e), m);                                           \
-      asm("trap;");                                                     \
     }                                                                   \
   } while (0)
 #else

@@ -13,11 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 #pragma once
 
-#ifdef PADDLE_WITH_HIP
-#include <rccl.h>
-#else
 #include <nccl.h>
-#endif
 
 #include <mutex>  // NOLINT
 #include "paddle/fluid/platform/dynload/dynamic_loader.h"
@@ -49,7 +45,7 @@ extern void* nccl_dso_handle;
 #define DECLARE_DYNAMIC_LOAD_NCCL_WRAP(__name) \
   struct DynLoad__##__name {                   \
     template <typename... Args>                \
-    rcclResult_t operator()(Args... args) {    \
+    ncclResult_t operator()(Args... args) {    \
       return __name(args...);                  \
     }                                          \
   };                                           \
@@ -57,20 +53,20 @@ extern void* nccl_dso_handle;
 #endif
 
 #define NCCL_RAND_ROUTINE_EACH(__macro) \
-  __macro(rcclCommInitAll);             \
-  __macro(rcclGetUniqueId);             \
-  __macro(rcclCommInitRank);            \
-  __macro(rcclCommDestroy);             \
-  __macro(rcclCommCount);               \
-  __macro(rcclCommCuDevice);            \
-  __macro(rcclCommUserRank);            \
-  __macro(rcclAllReduce);               \
-  __macro(rcclBcast);                   \
-  __macro(rcclAllGather);               \
-  __macro(rcclGroupStart);              \
-  __macro(rcclGroupEnd);                \
-  __macro(rcclReduce);                  \
-  __macro(rcclGetErrorString);
+  __macro(ncclCommInitAll);             \
+  __macro(ncclGetUniqueId);             \
+  __macro(ncclCommInitRank);            \
+  __macro(ncclCommDestroy);             \
+  __macro(ncclCommCount);               \
+  __macro(ncclCommCuDevice);            \
+  __macro(ncclCommUserRank);            \
+  __macro(ncclAllReduce);               \
+  __macro(ncclBcast);                   \
+  __macro(ncclAllGather);               \
+  __macro(ncclGroupStart);              \
+  __macro(ncclGroupEnd);                \
+  __macro(ncclReduce);                  \
+  __macro(ncclGetErrorString);
 
 NCCL_RAND_ROUTINE_EACH(DECLARE_DYNAMIC_LOAD_NCCL_WRAP)
 
