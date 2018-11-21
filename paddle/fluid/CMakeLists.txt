@@ -10,8 +10,8 @@ add_subdirectory(recordio)
 endif(NOT WIN32)
 
 # NOTE: please add subdirectory inference at last.
-add_subdirectory(inference)
 
 if (NOT WITH_AMD_GPU)
   add_subdirectory(train)
+  add_subdirectory(inference)
 endif (NOT WITH_AMD_GPU)
