@@ -427,7 +427,7 @@ void Executor::RunPreparedContext(ExecutorPrepareContext* ctx, Scope* scope,
   // skip while_op and while_grad_op temporarily
   if (max_memory_size >= 0 && !keep_kids) {
     ctx->ResetReferenceCount();
-#ifdef PADDLE_WITH_CUDA
+#if defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP)
     if (platform::is_gpu_place(place_)) {
       if (IsFastEagerDeletionModeEnabled()) {
         gc.reset(new UnsafeFastGPUGarbageCollector(
@@ -440,7 +440,7 @@ void Executor::RunPreparedContext(ExecutorPrepareContext* ctx, Scope* scope,
 #endif
       gc.reset(new CPUGarbageCollector(boost::get<platform::CPUPlace>(place_),
                                        max_memory_size));
-#ifdef PADDLE_WITH_CUDA
+#if defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP)
     }
 #endif
   }
