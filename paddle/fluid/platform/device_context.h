@@ -402,6 +402,17 @@ class CUDADeviceContext : public DeviceContext {
     PADDLE_ENFORCE(hipEventRecord(ev, stream_));
   }
 
+  template <typename Callback>
+  void AddStreamCallback(Callback&& callback) const {
+    std::lock_guard<std::mutex> guard(callback_mtx_);
+    callback_manager_->AddCallback(callback);
+  }
+
+  void WaitStreamCallback() const {
+    std::lock_guard<std::mutex> guard(callback_mtx_);
+    callback_manager_->Wait();
+  }
+
  private:
   CUDAPlace place_;
 
@@ -415,6 +426,12 @@ class CUDADeviceContext : public DeviceContext {
   int compute_capability;
   int multi_process;
   int max_threads_per_mp;
+
+  mutable std::mutex mtx_;
+  // This lock is only used by callback
+  // If we use mtx_ for StreamCallbackManager, deadlock may occur sometimes
+  mutable std::mutex callback_mtx_;
+  std::unique_ptr<StreamCallbackManager> callback_manager_;
 };
 
 template <>
