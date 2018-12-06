@@ -398,16 +398,8 @@ void ParallelExecutor::BCastParamsToDevices(
 #ifdef PADDLE_WITH_HIP
         for (size_t i = 0; i < member_->places_.size(); ++i) {
           auto &nccl_ctx = member_->nccl_ctxs_->at(member_->places_[i]);
-          if (initializing) {
-            platform::dynload::rcclBcast(buffers[i], numel, data_type, 0,
-                                         nccl_ctx.comm_, nccl_ctx.stream());
-          } else {
-            if (var_dev_id >= 0) {
-              platform::dynload::rcclBcast(buffers[i], numel, data_type,
-                                           var_dev_id, nccl_ctx.comm_,
-                                           nccl_ctx.stream());
-            }
-          }
+          platform::dynload::rcclBcast(buffers[i], numel, data_type, 0,
+                                       nccl_ctx.comm_, nccl_ctx.stream());
         }
 #endif
         member_->nccl_ctxs_->WaitAll();

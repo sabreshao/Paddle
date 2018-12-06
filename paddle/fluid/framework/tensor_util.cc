@@ -11,6 +11,7 @@
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License. */
+#include "hip/hip_runtime.h"
 #include "paddle/fluid/framework/tensor_util.h"
 #include <algorithm>
 #include <limits>
@@ -320,7 +321,7 @@ bool TensorIsfinite(const framework::Tensor& tensor) {
   return !Any(tensor, pred_inf) && !Any(tensor, pred_nan);
 }
 
-#ifdef PADDLE_WITH_CUDA
+#if (defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP))
 template <typename T>
 static inline void __global__ BothFalse(const T* cmp, T* out) {
   out[0] = (!cmp[0]) && (!out[0]);
@@ -339,9 +340,9 @@ struct BothFalseVisitor : public boost::static_visitor<> {
   }
 
   void VisitorImpl(const platform::CUDAPlace& gpu) const {
-#ifdef PADDLE_WITH_CUDA
+#if (defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP))
     auto* ctx = platform::DeviceContextPool::Instance().GetByPlace(gpu);
-    BothFalse<bool><<<1, 1, 0, ctx->stream()>>>(in_.data<bool>(),
+    hipLaunchKernelGGL(BothFalse<bool>, dim3(1), dim3(1), 0, ctx->stream(), in_.data<bool>(),
                                                 out_->mutable_data<bool>(gpu));
 #endif
   }

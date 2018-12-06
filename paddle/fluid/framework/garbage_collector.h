@@ -57,7 +57,7 @@ class CPUGarbageCollector : public GarbageCollector {
   void ClearCallback(const std::function<void()> &callback) override;
 };
 
-#ifdef PADDLE_WITH_CUDA
+#if (defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP))
 class UnsafeFastGPUGarbageCollector : public GarbageCollector {
  public:
   UnsafeFastGPUGarbageCollector(const platform::CUDAPlace &place,
@@ -87,13 +87,21 @@ class StreamGarbageCollector : public GarbageCollector {
 
   void Wait() const override;
 
+#ifdef PADDLE_WITH_CUDA
   cudaStream_t stream() const;
+#else
+  hipStream_t stream() const;
+#endif
 
  protected:
   void ClearCallback(const std::function<void()> &callback) override;
 
  private:
+#ifdef PADDLE_WITH_CUDA
   cudaStream_t stream_;
+#else
+  hipStream_t stream_;
+#endif
   std::unique_ptr<platform::StreamCallbackManager> callback_manager_;
 };
 #endif

@@ -198,7 +198,7 @@ TEST(Tensor, Slice) {
     EXPECT_EQ(src_data_address + 3 * 4 * 1 * sizeof(int), slice_data_address);
   }
 
-#ifdef PADDLE_WITH_CUDA
+#if (defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP))
   {
     framework::Tensor src_tensor;
     src_tensor.mutable_data<double>(framework::make_ddim({6, 9}),

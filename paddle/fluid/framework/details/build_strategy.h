@@ -26,6 +26,9 @@
 #if defined(PADDLE_WITH_CUDA) && !defined(_WIN32)
 #include "paddle/fluid/platform/nccl_helper.h"
 #endif
+#if defined(PADDLE_WITH_HIP)
+#include "paddle/fluid/platform/rccl_helper.h"
+#endif
 
 namespace paddle {
 namespace framework {
@@ -115,7 +118,7 @@ struct BuildStrategy {
                                    const std::string &loss_var_name,
                                    const std::vector<Scope *> &local_scopes,
                                    const size_t &nranks,
-#if defined(PADDLE_WITH_CUDA) && !defined(_WIN32)
+#if (defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP)) && !defined(_WIN32)
                                    const bool use_cuda,
                                    platform::NCCLContextMap *nccl_ctxs) const;
 #else

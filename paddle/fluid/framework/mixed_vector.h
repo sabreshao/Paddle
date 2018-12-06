@@ -31,7 +31,7 @@
 namespace paddle {
 namespace framework {
 
-#if defined(PADDLE_WITH_CUDA)
+#if defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP)
 // Vector<T> implements the std::vector interface, and can get Data or
 // MutableData from any place. The data will be synced implicitly inside.
 template <typename T>
@@ -457,7 +457,7 @@ class Vector {
   mutable details::COWPtr<VectorData> m_;
 };
 
-#else  // PADDLE_WITH_CUDA
+#else  // PADDLE_WITH_CUDA PADDLE_WITH_HIP
 
 template <typename T>
 class CPUVector : public std::vector<T, std::allocator<T>> {
@@ -529,7 +529,7 @@ class CPUVector : public std::vector<T, std::allocator<T>> {
 template <typename T>
 using Vector = CPUVector<T>;
 
-#endif  // PADDLE_WITH_CUDA
+#endif  // PADDLE_WITH_CUDA PADDLE_WITH_HIP
 
 };  // namespace framework
 }  // namespace paddle
