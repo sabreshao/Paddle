@@ -22,6 +22,9 @@
 #if defined(PADDLE_WITH_CUDA) && !defined(_WIN32)
 #include "paddle/fluid/platform/nccl_helper.h"
 #endif
+#if defined(PADDLE_WITH_HIP)
+#include "paddle/fluid/platform/rccl_helper.h"
+#endif
 
 namespace paddle {
 namespace framework {
@@ -29,7 +32,7 @@ namespace details {
 
 struct DataBalanceOpHandle : public OpHandleBase {
  public:
-#if defined(PADDLE_WITH_CUDA) && !defined(_WIN32)
+#if ((defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP)) && !defined(_WIN32))
   DataBalanceOpHandle(ir::Node *node, const std::vector<Scope *> &local_scopes,
                       const std::vector<platform::Place> &places,
                       const platform::NCCLContextMap *ctxs);
