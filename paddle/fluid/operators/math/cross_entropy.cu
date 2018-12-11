@@ -96,9 +96,9 @@ class CrossEntropyFunctor<platform::CUDADeviceContext, T> {
 };
 
 template class CrossEntropyFunctor<platform::CUDADeviceContext, float>;
-template class CrossEntropyFunctor<platform::CUDADeviceContext, double>;
-template class CrossEntropyFunctor<platform::CUDADeviceContext,
-                                   platform::float16>;
+//template class CrossEntropyFunctor<platform::CUDADeviceContext, double>;
+//template class CrossEntropyFunctor<platform::CUDADeviceContext,
+//                                   platform::float16>;
 }  // namespace math
 }  // namespace operators
 }  // namespace paddle

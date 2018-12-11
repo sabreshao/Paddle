@@ -34,6 +34,7 @@ template <typename T>
 class CUDNNConvTransposeOpKernel : public framework::OpKernel<T> {
  public:
   void Compute(const framework::ExecutionContext& ctx) const override {
+#ifdef CUDNN_PORTING
     PADDLE_ENFORCE(platform::is_gpu_place(ctx.GetPlace()),
                    "It must use CUDAPlace.");
     auto* input = ctx.Input<Tensor>("Input");
@@ -115,6 +116,7 @@ class CUDNNConvTransposeOpKernel : public framework::OpKernel<T> {
       };
       workspace_handle.RunFunc(cudnn_func, workspace_size_in_bytes);
     }
+#endif
   }
 };
 
@@ -122,6 +124,7 @@ template <typename T>
 class CUDNNConvTransposeGradOpKernel : public framework::OpKernel<T> {
  public:
   void Compute(const framework::ExecutionContext& ctx) const override {
+#ifdef CUDNN_PORTING
     PADDLE_ENFORCE(platform::is_gpu_place(ctx.GetPlace()),
                    "It must use CUDAPlace.");
     auto input = ctx.Input<Tensor>("Input");
@@ -243,6 +246,7 @@ class CUDNNConvTransposeGradOpKernel : public framework::OpKernel<T> {
         workspace_handle.RunFunc(cudnn_func, workspace_size_in_bytes);
       }
     }
+#endif
   }
 };
 
@@ -262,5 +266,5 @@ REGISTER_OP_KERNEL(conv3d_transpose, CUDNN, ::paddle::platform::CUDAPlace,
                    ops::CUDNNConvTransposeOpKernel<float>,
                    ops::CUDNNConvTransposeOpKernel<double>);
 REGISTER_OP_KERNEL(conv3d_transpose_grad, CUDNN, ::paddle::platform::CUDAPlace,
-                   ops::CUDNNConvTransposeGradOpKernel<float>,
-                   ops::CUDNNConvTransposeGradOpKernel<double>);
+                   ops::CUDNNConvTransposeGradOpKernel<float>
+                   /*,ops::CUDNNConvTransposeGradOpKernel<double>*/);

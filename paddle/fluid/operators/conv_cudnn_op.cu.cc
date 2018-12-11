@@ -18,7 +18,11 @@ limitations under the License. */
 #include "paddle/fluid/operators/conv_cudnn_op_cache.h"
 #include "paddle/fluid/operators/conv_op.h"
 #include "paddle/fluid/platform/assert.h"
+#ifdef PADDLE_WITH_CUDA
 #include "paddle/fluid/platform/cudnn_helper.h"
+#else
+#include "paddle/fluid/platform/miopen_helper.h"
+#endif
 #include "paddle/fluid/platform/float16.h"
 #include "paddle/fluid/platform/profiler.h"
 
@@ -40,13 +44,16 @@ using ScopedTensorDescriptor = platform::ScopedTensorDescriptor;
 using ScopedFilterDescriptor = platform::ScopedFilterDescriptor;
 using ScopedConvolutionDescriptor = platform::ScopedConvolutionDescriptor;
 using DataLayout = platform::DataLayout;
+#ifdef CUDNN_PORTING
 template <typename T>
 using ScalingParamType = typename platform::CudnnDataType<T>::ScalingParamType;
+#endif
 
 template <typename T>
 class CUDNNConvOpKernel : public framework::OpKernel<T> {
  public:
   void Compute(const framework::ExecutionContext& ctx) const override {
+#ifdef CUDNN_PORTING
     auto& dev_ctx = ctx.template device_context<platform::CUDADeviceContext>();
     PADDLE_ENFORCE(platform::is_gpu_place(ctx.GetPlace()),
                    "It must use CUDAPlace.");
@@ -231,6 +238,7 @@ class CUDNNConvOpKernel : public framework::OpKernel<T> {
       };
       workspace_handle.RunFunc(cudnn_func, workspace_size_in_bytes);
     }
+#endif
   }
 };
 
@@ -238,6 +246,7 @@ template <typename T>
 class CUDNNConvGradOpKernel : public framework::OpKernel<T> {
  public:
   void Compute(const framework::ExecutionContext& ctx) const override {
+#ifdef CUDNN_PORTING
     auto& dev_ctx = ctx.template device_context<platform::CUDADeviceContext>();
     PADDLE_ENFORCE(platform::is_gpu_place(ctx.GetPlace()),
                    "It must use CUDAPlace.");
@@ -501,6 +510,7 @@ class CUDNNConvGradOpKernel : public framework::OpKernel<T> {
         workspace_handle.RunFunc(cudnn_func, workspace_size_in_bytes);
       }
     }
+#endif
   }
 };
 
@@ -524,3 +534,4 @@ REGISTER_OP_KERNEL(conv3d, CUDNN, plat::CUDAPlace,
 REGISTER_OP_KERNEL(conv3d_grad, CUDNN, plat::CUDAPlace,
                    paddle::operators::CUDNNConvGradOpKernel<float>,
                    paddle::operators::CUDNNConvGradOpKernel<double>);
+

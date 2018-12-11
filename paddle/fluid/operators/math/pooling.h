@@ -94,7 +94,7 @@ HOSTDEVICE inline int AdaptEndIndex(int ph, int input_size, int output_size) {
  * This is different from average pooling. So we rewrite the max_pool_grad:
  * MaxPool2dGradFunctor, MaxPool3dGradFunctor.
  */
-#ifdef PADDLE_WITH_CUDA
+#if defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP)
 template <typename PoolProcess, typename T>
 class Pool2dDirectCUDAFunctor {
  public:
@@ -103,7 +103,7 @@ class Pool2dDirectCUDAFunctor {
                   const std::vector<int>& ksize,
                   const std::vector<int>& strides,
                   const std::vector<int>& paddings, PoolProcess pool_compute,
-                  bool exclusive, T* output, cudaStream_t stream);
+                  bool exclusive, T* output, hipStream_t stream);
 };
 #endif
 

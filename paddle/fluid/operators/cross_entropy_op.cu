@@ -19,11 +19,11 @@ namespace plat = paddle::platform;
 namespace ops = paddle::operators;
 using CUDACtx = paddle::platform::CUDADeviceContext;
 REGISTER_OP_CUDA_KERNEL(cross_entropy,
-                        ops::CrossEntropyOpKernel<CUDACtx, float>,
-                        ops::CrossEntropyOpKernel<CUDACtx, double>,
-                        ops::CrossEntropyOpKernel<CUDACtx, plat::float16>);
+                        ops::CrossEntropyOpKernel<CUDACtx, float>);
+//                        ops::CrossEntropyOpKernel<CUDACtx, double>,
+//                        ops::CrossEntropyOpKernel<CUDACtx, plat::float16>);
 
 REGISTER_OP_CUDA_KERNEL(
-    cross_entropy_grad, ops::CrossEntropyGradientOpKernel<CUDACtx, float>,
-    ops::CrossEntropyGradientOpKernel<CUDACtx, double>,
-    ops::CrossEntropyGradientOpKernel<CUDACtx, plat::float16>);
+    cross_entropy_grad, ops::CrossEntropyGradientOpKernel<CUDACtx, float>);
+//    ops::CrossEntropyGradientOpKernel<CUDACtx, double>,
+//    ops::CrossEntropyGradientOpKernel<CUDACtx, plat::float16>);

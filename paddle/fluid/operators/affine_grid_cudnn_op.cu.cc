@@ -26,6 +26,7 @@ template <typename T>
 class CUDNNAffineGridOpKernel : public framework::OpKernel<T> {
  public:
   void Compute(const framework::ExecutionContext& ctx) const override {
+#ifdef CUDNN_PORTING
     PADDLE_ENFORCE(platform::is_gpu_place(ctx.GetPlace()),
                    "It must use CUDAPlace.");
     auto& dev_ctx = ctx.template device_context<platform::CUDADeviceContext>();
@@ -58,6 +59,7 @@ class CUDNNAffineGridOpKernel : public framework::OpKernel<T> {
 
     PADDLE_ENFORCE(platform::dynload::cudnnSpatialTfGridGeneratorForward(
         handle, cudnn_st_desc, theta_data, output_data));
+#endif
   }
 };
 
@@ -65,6 +67,7 @@ template <typename T>
 class CUDNNAffineGridGradOpKernel : public framework::OpKernel<T> {
  public:
   void Compute(const framework::ExecutionContext& ctx) const override {
+#ifdef CUDNN_PORTING
     PADDLE_ENFORCE(platform::is_gpu_place(ctx.GetPlace()),
                    "It must use CUDAPlace.");
     auto& dev_ctx = ctx.template device_context<platform::CUDADeviceContext>();
@@ -97,6 +100,7 @@ class CUDNNAffineGridGradOpKernel : public framework::OpKernel<T> {
 
     PADDLE_ENFORCE(platform::dynload::cudnnSpatialTfGridGeneratorBackward(
         handle, cudnn_st_desc, output_grad_data, theta_grad_data));
+#endif
   }
 };
 

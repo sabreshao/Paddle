@@ -20,16 +20,19 @@ limitations under the License. */
 namespace paddle {
 namespace operators {
 
-#if CUDNN_VERSION >= 7001
+#if CUDNN_VERSION >= 7001 || defined(PADDLE_WITH_HIP)
+#ifdef CUDNN_PORTING
 using ScopedTensorDescriptor = platform::ScopedTensorDescriptor;
 using ScopedCTCLossDescriptor = platform::ScopedCTCLossDescriptor;
 using DataLayout = platform::DataLayout;
+#endif
 
 template <typename DeviceContext, typename T>
 class CudnnCTCKernel : public framework::OpKernel<T> {
  public:
   void Compute(const framework::ExecutionContext& ctx) const override {
     // =====================Copied code from warpctc===========================
+#ifdef CUDNN_PORTING
     auto* logits = ctx.Input<LoDTensor>("Logits");
     auto* label = ctx.Input<LoDTensor>("Label");
     auto* warpctc_grad = ctx.Output<LoDTensor>("WarpCTCGrad");
@@ -134,7 +137,6 @@ class CudnnCTCKernel : public framework::OpKernel<T> {
     auto cu_grad_desc = grad_desc.descriptor<T>(
         layout, framework::vectorize2int(warpctc_grad->dims()));
     auto cu_ctcloss_desc = ctcloss_desc.descriptor<T>();
-
     auto handle = dev_ctx.cudnn_handle();
     size_t workspace_size;
 
@@ -155,6 +157,7 @@ class CudnnCTCKernel : public framework::OpKernel<T> {
           workspace_size));
     };
     workspace_handle.RunFunc(cudnn_func, workspace_size);
+#endif
   }
 };
 
@@ -185,7 +188,7 @@ class CudnnCTCGradKernel : public framework::OpKernel<T> {
 
 namespace ops = paddle::operators;
 namespace plat = paddle::platform;
-#if CUDNN_VERSION >= 7001
+#if CUDNN_VERSION >= 7001 || defined(PADDLE_WITH_HIP)
 REGISTER_OP_KERNEL(
     warpctc, CUDNN, plat::CUDAPlace,
     ops::CudnnCTCKernel<paddle::platform::CUDADeviceContext, float>);
