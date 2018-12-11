@@ -187,7 +187,7 @@ void Pool2dDirectCUDAFunctor<PoolProcess, T>::operator()(
     const T* input, const std::vector<int>& input_shape,
     const std::vector<int>& output_shape, const std::vector<int>& ksize,
     const std::vector<int>& strides, const std::vector<int>& paddings,
-    PoolProcess pool_compute, bool exclusive, T* output, cudaStream_t stream) {
+    PoolProcess pool_compute, bool exclusive, T* output, hipStream_t stream) {
   const int batch_size = input_shape[0];
   const int input_channels = input_shape[1];
   const int input_height = input_shape[2];
@@ -207,7 +207,7 @@ void Pool2dDirectCUDAFunctor<PoolProcess, T>::operator()(
   dim3 threads(1024, 1);
   dim3 grid(blocks, 1);
 
-  KernelPool2D<PoolProcess, T><<<grid, threads, 0, stream>>>(
+  hipLaunchKernelGGL((KernelPool2D<PoolProcess, T>), dim3(grid), dim3(threads), 0, stream,
       nthreads, input, input_channels, input_height, input_width, output_height,
       output_width, ksize_height, ksize_width, stride_height, stride_width,
       padding_height, padding_width, pool_compute, exclusive, false, output);
