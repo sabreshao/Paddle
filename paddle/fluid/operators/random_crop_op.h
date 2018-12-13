@@ -19,7 +19,7 @@
 #include "paddle/fluid/operators/detail/safe_ref.h"
 #include "paddle/fluid/platform/device_context.h"
 #include "paddle/fluid/platform/for_range.h"
-#ifdef PADDLE_WITH_CUDA
+#if (defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP))
 #include <thrust/random.h>
 #endif
 
@@ -37,7 +37,7 @@ struct Random<platform::CPUDeviceContext> {
   using UniformIntDist = std::uniform_int_distribution<T>;
 };
 
-#ifdef PADDLE_WITH_CUDA
+#if (defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP))
 template <>
 struct Random<platform::CUDADeviceContext> {
   using Engine = thrust::minstd_rand;
@@ -119,6 +119,7 @@ struct RandomCropFunctor {
   }
 
   HOSTDEVICE void operator()(size_t ins_idx) {
+#if 0
     typename Random<DeviceContext>::Engine engine(seed_);
     engine.discard(ins_idx * (rank_ - num_batchsize_dims_));
     size_t offsets[9];
@@ -135,6 +136,7 @@ struct RandomCropFunctor {
                      out_dims_ + num_batchsize_dims_, 0,
                      rank_ - num_batchsize_dims_, prod_x_ins_dims_,
                      prod_out_ins_dims_, offsets);
+#endif
   }
 };
 

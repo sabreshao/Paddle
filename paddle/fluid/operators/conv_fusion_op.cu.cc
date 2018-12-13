@@ -14,7 +14,12 @@ limitations under the License. */
 
 #include "paddle/fluid/framework/op_registry.h"
 #include "paddle/fluid/operators/conv_cudnn_op_cache.h"
+#ifdef PADDLE_WIFH_CUDA
 #include "paddle/fluid/platform/cudnn_helper.h"
+#endif
+#ifdef PADDLE_WITH_HIP
+#include "paddle/fluid/platform/miopen_helper.h"
+#endif
 
 DEFINE_int64(cudnn_exhaustive_search_times, -1,
              "Exhaustive search times for cuDNN convolution, "

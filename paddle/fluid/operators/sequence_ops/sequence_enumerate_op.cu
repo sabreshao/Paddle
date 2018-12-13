@@ -69,8 +69,8 @@ class SequenceEnumerateOpCUDAKernel : public framework::OpKernel<T> {
     // Copy LoD to GPU
     const size_t* dev_in_lod_ptr = lod0.CUDAData(context.GetPlace());
     // Calc output tensor
-    CalcOutPut<<<(in_len - 1) / PADDLE_CUDA_NUM_THREADS + 1,
-                 PADDLE_CUDA_NUM_THREADS, 0, stream>>>(
+    hipLaunchKernelGGL((CalcOutPut<T>), dim3((in_len - 1) / PADDLE_CUDA_NUM_THREADS + 1),
+                 dim3(PADDLE_CUDA_NUM_THREADS), 0, stream,
         in_data, dev_in_lod_ptr, lod0.size(), win_size, pad_value, out_data);
   }
 };

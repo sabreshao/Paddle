@@ -12,7 +12,13 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-#include "cub/cub.cuh"
+#if defined(PADDLE_WITH_CUDA)
+#include <cub/cub.cuh>	#include <cub/cub.cuh>
+namespace gpuprim = ::cub;
+#elif defined(PADDLE_WITH_HIP)
+#include <hipcub/hipcub.hpp>
+namespace gpuprim = ::hipcub;
+#endif
 #include "paddle/fluid/framework/data_layout.h"
 #include "paddle/fluid/framework/op_registry.h"
 #include "paddle/fluid/platform/cuda_primitives.h"
@@ -66,12 +72,12 @@ class AffineChannelCUDAKernel : public framework::OpKernel<T> {
     int block = 1024;
     int grid = (num + block - 1) / block;
     if (layout == framework::DataLayout::kNCHW) {
-      KeAffineChannelCUDA<T, framework::DataLayout::kNCHW,
-                          true><<<grid, block, 0, dev_ctx.stream()>>>(
+      hipLaunchKernelGGL((KeAffineChannelCUDA<T, framework::DataLayout::kNCHW,
+                          true>), dim3(grid), dim3(block), 0, dev_ctx.stream(),
           x_d, scale_d, bias_d, C, HxW, num, y_d);
     } else {
-      KeAffineChannelCUDA<T, framework::DataLayout::kNHWC,
-                          true><<<grid, block, 0, dev_ctx.stream()>>>(
+      hipLaunchKernelGGL((KeAffineChannelCUDA<T, framework::DataLayout::kNHWC,
+                          true>), dim3(grid), dim3(block), 0, dev_ctx.stream(),
           x_d, scale_d, bias_d, C, HxW, num, y_d);
     }
   }
@@ -83,7 +89,7 @@ __global__ void AffineChannelScaleBiasGradientCUDAKernel(
     T* dbias) {
   const int outer_size = C;
   const int inner_size = N * HxW;
-  typedef cub::BlockReduce<T, BlockDim> BlockReduce;
+  typedef gpuprim::BlockReduce<T, BlockDim> BlockReduce;
   __shared__ typename BlockReduce::TempStorage ds_storage;
   __shared__ typename BlockReduce::TempStorage db_storage;
 
@@ -97,8 +103,8 @@ __global__ void AffineChannelScaleBiasGradientCUDAKernel(
       ds_sum += dy[index] * x[index];
       db_sum += dy[index];
     }
-    ds_sum = BlockReduce(ds_storage).Reduce(ds_sum, cub::Sum());
-    db_sum = BlockReduce(db_storage).Reduce(db_sum, cub::Sum());
+    ds_sum = BlockReduce(ds_storage).Reduce(ds_sum, gpuprim::Sum());
+    db_sum = BlockReduce(db_storage).Reduce(db_sum, gpuprim::Sum());
     if (threadIdx.x == 0) {
       dscale[i] = ds_sum;
       dbias[i] = db_sum;
@@ -147,26 +153,26 @@ class AffineChannelGradCUDAKernel : public framework::OpKernel<T> {
     int grid2 = std::min(C, max_blocks);
     if (layout == framework::DataLayout::kNCHW) {
       if (dx) {
-        KeAffineChannelCUDA<T, framework::DataLayout::kNCHW,
-                            false><<<grid1, block, 0, dev_ctx.stream()>>>(
+        hipLaunchKernelGGL((KeAffineChannelCUDA<T, framework::DataLayout::kNCHW,
+                            false>), dim3(grid1), dim3(block), 0, dev_ctx.stream(),
             dy_d, s_d, nullptr, C, HxW, num, dx_d);
       }
       if (dscale && dbias) {
-        AffineChannelScaleBiasGradientCUDAKernel<
-            T, block, framework::DataLayout::kNCHW><<<grid2, block, 0,
-                                                      dev_ctx.stream()>>>(
+        hipLaunchKernelGGL((AffineChannelScaleBiasGradientCUDAKernel<
+            T, block, framework::DataLayout::kNCHW>), dim3(grid2), dim3(block), 0,
+                                                      dev_ctx.stream(),
             dy_d, x_d, N, C, HxW, ds_d, db_d);
       }
     } else {
       if (dx) {
-        KeAffineChannelCUDA<T, framework::DataLayout::kNCHW,
-                            false><<<grid1, block, 0, dev_ctx.stream()>>>(
+        hipLaunchKernelGGL((KeAffineChannelCUDA<T, framework::DataLayout::kNCHW,
+                            false>), dim3(grid1), dim3(block), 0, dev_ctx.stream(),
             dy_d, s_d, nullptr, C, HxW, num, dx_d);
       }
       if (dscale && dbias) {
-        AffineChannelScaleBiasGradientCUDAKernel<
-            T, block, framework::DataLayout::kNHWC><<<grid2, block, 0,
-                                                      dev_ctx.stream()>>>(
+        hipLaunchKernelGGL((AffineChannelScaleBiasGradientCUDAKernel<
+            T, block, framework::DataLayout::kNHWC>), dim3(grid2), dim3(block), 0,
+                                                      dev_ctx.stream(),
             dy_d, x_d, N, C, HxW, ds_d, db_d);
       }
     }

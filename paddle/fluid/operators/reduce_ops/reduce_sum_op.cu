@@ -52,8 +52,8 @@ class ReduceSumKernel : public framework::OpKernel<T> {
     }
 
     auto stream = context.cuda_device_context().stream();
-    TensorReduce<T, T, cub::Sum, IdentityFunctor<T>>(
-        *input, output, reduce_dims, static_cast<T>(0), cub::Sum(),
+    TensorReduce<T, T, gpuprim::Sum, IdentityFunctor<T>>(
+        *input, output, reduce_dims, static_cast<T>(0), gpuprim::Sum(),
         IdentityFunctor<T>(), stream);
   }
 };

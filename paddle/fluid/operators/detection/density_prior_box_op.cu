@@ -19,7 +19,7 @@ namespace operators {
 
 template <typename T>
 static __device__ inline T Clip(T in) {
-  return min(max(in, 0.), 1.);
+  return fmin(fmax(in, 0.f), 1.f);
 }
 
 template <typename T>
@@ -53,10 +53,10 @@ static __global__ void GenDensityPriorBox(
       T box_width_ratio = width_ratio[k] / 2.;
       T box_height_ratio = height_ratio[k] / 2.;
 
-      T xmin = max((center_x_temp - box_width_ratio) / im_width, 0.);
-      T ymin = max((center_y_temp - box_height_ratio) / im_height, 0.);
-      T xmax = min((center_x_temp + box_width_ratio) / im_width, 1.);
-      T ymax = min((center_y_temp + box_height_ratio) / im_height, 1.);
+      T xmin = fmax((center_x_temp - box_width_ratio) / im_width, 0.f);
+      T ymin = fmax((center_y_temp - box_height_ratio) / im_height, 0.f);
+      T xmax = fmin((center_x_temp + box_width_ratio) / im_width, 1.f);
+      T ymax = fmin((center_y_temp + box_height_ratio) / im_height, 1.f);
 
       int out_offset = (j * width * num_priors + i) * 4;
       out[out_offset] = is_clip ? Clip<T>(xmin) : xmin;
@@ -155,7 +155,7 @@ class DensityPriorBoxOpCUDAKernel : public framework::OpKernel<T> {
 
     auto stream =
         ctx.template device_context<platform::CUDADeviceContext>().stream();
-    GenDensityPriorBox<T><<<grids, threads, 0, stream>>>(
+    hipLaunchKernelGGL((GenDensityPriorBox<T>), dim3(grids), dim3(threads), 0, stream,
         feature_height, feature_width, img_height, img_width, offset,
         step_width, step_height, num_priors, d_temp.data<T>(), is_clip,
         variances[0], variances[1], variances[2], variances[3],

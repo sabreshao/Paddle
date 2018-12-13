@@ -11,6 +11,7 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
+#include "hip/hip_runtime.h"
 #include <thrust/device_ptr.h>
 #include <thrust/iterator/counting_iterator.h>
 #include <thrust/random.h>
@@ -87,8 +88,7 @@ class GPUDropoutKernel : public framework::OpKernel<T> {
 
       int threads = 512;
       int grid = (x->numel() + threads - 1) / threads;
-      RandomGenerator<
-          T><<<grid, threads, 0, context.cuda_device_context().stream()>>>(
+      hipLaunchKernelGGL((RandomGenerator<T>), dim3(grid), dim3(threads), 0, context.cuda_device_context().stream(), 
           size, seed, dropout_prob, x_data, mask_data, y_data,
           (dropout_implementation == "upscale_in_train"));
     } else {

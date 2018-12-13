@@ -15,7 +15,12 @@ limitations under the License. */
 #include "paddle/fluid/operators/fused/fusion_transpose_flatten_concat_op.h"
 #include <vector>
 #include "paddle/fluid/framework/op_registry.h"
+#ifdef PADDLE_WITH_CUDA
 #include "paddle/fluid/platform/cudnn_helper.h"
+#endif
+#ifdef PADDLE_WITH_HIP
+#include "paddle/fluid/platform/miopen_helper.h"
+#endif
 
 namespace paddle {
 namespace operators {

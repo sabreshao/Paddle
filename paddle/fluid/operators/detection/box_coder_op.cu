@@ -9,6 +9,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
+#include "hip/hip_runtime.h"
 #include "paddle/fluid/operators/detection/box_coder_op.h"
 #include "paddle/fluid/platform/cuda_primitives.h"
 
@@ -150,12 +151,12 @@ class BoxCoderCUDAKernel : public framework::OpKernel<T> {
     auto code_type = GetBoxCodeType(context.Attr<std::string>("code_type"));
     bool normalized = context.Attr<bool>("box_normalized");
     if (code_type == BoxCodeType::kEncodeCenterSize) {
-      EncodeCenterSizeKernel<T><<<grid, block, 0, device_ctx.stream()>>>(
-          prior_box_data, prior_box_var_data, target_box_data, row, col, len,
+      hipLaunchKernelGGL((EncodeCenterSizeKernel<T>), dim3(grid), dim3(block), 0, device_ctx.stream(),
+          prior_box_data, prior_box_var_data, target_box_data, int(row), int(col), int(len),
           normalized, output);
     } else if (code_type == BoxCodeType::kDecodeCenterSize) {
-      DecodeCenterSizeKernel<T><<<grid, block, 0, device_ctx.stream()>>>(
-          prior_box_data, prior_box_var_data, target_box_data, row, col, len,
+      hipLaunchKernelGGL((DecodeCenterSizeKernel<T>), dim3(grid), dim3(block), 0, device_ctx.stream(),
+          prior_box_data, prior_box_var_data, target_box_data, int(row), int(col), int(len),
           normalized, output);
     }
   }

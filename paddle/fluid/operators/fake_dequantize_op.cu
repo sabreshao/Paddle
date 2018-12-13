@@ -39,7 +39,7 @@ struct DequantizeFunctor<platform::CUDADeviceContext, T> {
     int block = 512;
     int grid = (num + block - 1) / block;
 
-    KeDequantize<T><<<grid, block, 0, dev_ctx.stream()>>>(
+    hipLaunchKernelGGL((KeDequantize<T>), dim3(grid), dim3(block), 0, dev_ctx.stream(),
         in_data, scale_factor, max_range, num, out_data);
   }
 };

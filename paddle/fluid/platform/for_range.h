@@ -74,7 +74,7 @@ struct ForRange<CUDADeviceContext> {
       ForRangeElemwiseOpGridIsOne<<<1, block_size, 0, dev_ctx_.stream()>>>(
           func);
 #else
-      hipLaunchKernelGGL((ForRangeElemwiseOpGridIsOne), dim3(1), dim3(block_size), 0, dev_ctx_.stream(), 
+      hipLaunchKernelGGL((ForRangeElemwiseOpGridIsOne<Function>), dim3(1), dim3(block_size), 0, dev_ctx_.stream(), 
           func);
 #endif
     } else {
@@ -82,7 +82,7 @@ struct ForRange<CUDADeviceContext> {
       ForRangeElemwiseOp<<<grid_size, block_size, 0, dev_ctx_.stream()>>>(
           func, limit_);
 #else
-      hipLaunchKernelGGL((ForRangeElemwiseOp), dim3(grid_size), dim3(block_size), 0, dev_ctx_.stream(), 
+      hipLaunchKernelGGL((ForRangeElemwiseOp<Function>), dim3(grid_size), dim3(block_size), 0, dev_ctx_.stream(), 
           func, limit_);
 #endif
     }

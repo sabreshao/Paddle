@@ -12,7 +12,13 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
+#if defined(PADDLE_WITH_CUDA)
 #include <cub/cub.cuh>
+namespace gpuprim = ::cub;
+#elif defined(PADDLE_WITH_HIP)
+#include <hipcub/hipcub.hpp>
+namespace gpuprim = ::hipcub;
+#endif
 #include "paddle/fluid/operators/group_norm_op.h"
 
 namespace paddle {
@@ -118,10 +124,10 @@ class GroupNormKernel<platform::CUDADeviceContext, T>
     int block_size = std::min(512, imsize);
     dim3 grid(group_size, groups, x_dims[0]);
     dim3 threads(block_size, 1, 1);
-    GroupNormForwardGetMeanAndVar<T><<<grid, threads, 0, dev_ctx.stream()>>>(
+    hipLaunchKernelGGL((GroupNormForwardGetMeanAndVar<T>), dim3(grid), dim3(threads), 0, dev_ctx.stream(),
         x_data, x_dims[0], x_dims[1], imsize, groups, group_size, mean_data,
         temp_var_data);
-    GroupNormForward<T><<<grid, threads, 0, dev_ctx.stream()>>>(
+    hipLaunchKernelGGL((GroupNormForward<T>), dim3(grid), dim3(threads), 0, dev_ctx.stream(),
         x_data, mean_data, temp_var_data, scale_data, bias_data, x_dims[0],
         x_dims[1], imsize, groups, group_size, epsilon, y_data, var_data);
   }
@@ -268,11 +274,11 @@ class GroupNormGradKernel<platform::CUDADeviceContext, T>
     int block_size = std::min(512, imsize);
     dim3 grid(group_size, groups, x_dims[0]);
     dim3 threads(block_size, 1, 1);
-    GroupNormBackwardGetMeanAndVar<T><<<grid, threads, 0, dev_ctx.stream()>>>(
+    hipLaunchKernelGGL((GroupNormBackwardGetMeanAndVar<T>), dim3(grid), dim3(threads), 0, dev_ctx.stream(),
         x_data, mean_data, var_data, scale_data, y_data, x_dims[0], x_dims[1],
         imsize, groups, group_size, epsilon, d_x_data, temp_mean_data,
         temp_var_data, d_scale_data, d_bias_data);
-    GroupNormBackward<T><<<grid, threads, 0, dev_ctx.stream()>>>(
+    hipLaunchKernelGGL((GroupNormBackward<T>), dim3(grid), dim3(threads), 0, dev_ctx.stream(),
         x_data, mean_data, var_data, temp_mean_data, temp_var_data, x_dims[0],
         x_dims[1], imsize, groups, group_size, epsilon, d_x_data);
   }
