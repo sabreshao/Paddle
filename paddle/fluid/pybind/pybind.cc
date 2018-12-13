@@ -691,7 +691,7 @@ All parameter, weight, gradient are variables in Paddle.
   });
 #elif defined(PADDLE_WITH_HIP)
   m.def("is_float16_supported", [](const platform::CUDAPlace &place) -> bool {
-    return false;
+    return true;
   });
 #endif
 

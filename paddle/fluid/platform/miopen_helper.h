@@ -43,10 +43,41 @@ enum class DataLayout {  // Not use
 };
 
 enum class PoolingMode {
-
   kMaximum,
-  kAverage,
+  kMaximumDeterministic,
+  kAverageExclusive,
+  kAverageInclusive,
 };
+
+enum ActivationMode {
+  kNone,  // activation identity
+  kSigmoid,
+  kRelu,
+  kRelu6,
+  kReluX,
+  kTanh,
+  kBandPass,
+};
+
+inline ActivationMode StringToActivationMode(const std::string& str) {
+  if (str == "identity") {
+    return ActivationMode::kNone;
+  } else if (str == "sigmoid") {
+    return ActivationMode::kSigmoid;
+  } else if (str == "relu") {
+    return ActivationMode::kRelu;
+  } else if (str == "relu6") {
+    return ActivationMode::kRelu6;
+  } else if (str == "relux") {
+    return ActivationMode::kReluX;
+  } else if (str == "tanh") {
+    return ActivationMode::kTanh;
+  } else if (str == "bandpass") {
+    return ActivationMode::kBandPass;
+  } else {
+    PADDLE_THROW("Unknown activation string: %s", str);
+  }
+}
 
 template <typename T>
 class MIOpenDataType;
@@ -110,7 +141,7 @@ class ScopedTensorDescriptor {
      dims_with_group[1] = dims_with_group[1] / groups;
    }
    if (dims_with_group.size()!=4){
-     PADDLE_THROW("miopen only supports 4D tensors, dim=%d not allowed",dims_with_group.size());
+   	PADDLE_THROW("miopen only supports 4D tensors, dim=%d not allowed",dims_with_group.size());
    }
    PADDLE_ENFORCE(dynload::miopenSet4dTensorDescriptor(
        desc_, type, dims_with_group[0], dims_with_group[1], dims_with_group[2], dims_with_group[3]));
@@ -234,6 +265,80 @@ class ScopedPoolingDescriptor {
  private:
   miopenPoolingDescriptor_t desc_;
   DISABLE_COPY_AND_ASSIGN(ScopedPoolingDescriptor);
+};
+
+class ScopedSpatialTransformerDescriptor {
+ public:
+  ScopedSpatialTransformerDescriptor() {
+    //PADDLE_ENFORCE(dynload::cudnnCreateSpatialTransformerDescriptor(&desc_));
+  }
+  ~ScopedSpatialTransformerDescriptor() {
+    //PADDLE_ENFORCE(dynload::cudnnDestroySpatialTransformerDescriptor(desc_));
+  }
+
+#if 0
+  template <typename T>
+  inline cudnnSpatialTransformerDescriptor_t descriptor(const int nbDims,
+                                                        const int dimA[]) {
+    PADDLE_ENFORCE(dynload::cudnnSetSpatialTransformerNdDescriptor(
+        desc_, CUDNN_SAMPLER_BILINEAR, CudnnDataType<T>::type, nbDims, dimA));
+    return desc_;
+  }
+#endif
+
+ private:
+  //cudnnSpatialTransformerDescriptor_t desc_;
+  DISABLE_COPY_AND_ASSIGN(ScopedSpatialTransformerDescriptor);
+};
+
+class ScopedActivationDescriptor {
+ public:
+  ScopedActivationDescriptor() {
+    PADDLE_ENFORCE(dynload::miopenCreateActivationDescriptor(&desc_));
+  }
+  ~ScopedActivationDescriptor() {
+    PADDLE_ENFORCE(dynload::miopenDestroyActivationDescriptor(desc_));
+  }
+
+  template <typename T>
+  inline miopenActivationDescriptor_t descriptor(
+      const std::string& act, double value_max = static_cast<double>(0.)) {
+    double relu_ceiling = 0.0;
+    ActivationMode activation_mode = StringToActivationMode(act);
+    miopenActivationMode_t mode;
+    switch (activation_mode) {
+      case ActivationMode::kNone:
+        mode = miopenActivationPASTHRU;
+        break;
+      case ActivationMode::kRelu6:
+        relu_ceiling = 6.0;
+        mode = miopenActivationCLIPPEDRELU;
+        break;
+      case ActivationMode::kReluX:
+        relu_ceiling = value_max;
+        mode = miopenActivationCLIPPEDRELU;
+        break;
+      case ActivationMode::kRelu:
+        mode = miopenActivationRELU;
+        break;
+      case ActivationMode::kSigmoid:
+        mode = miopenActivationLOGISTIC;
+        break;
+      case ActivationMode::kTanh:
+        mode = miopenActivationTANH;
+        break;
+      default:
+        PADDLE_THROW("unrecognized activation mode: %d .",
+                     static_cast<int>(activation_mode));
+    }
+    PADDLE_ENFORCE(dynload::miopenSetActivationDescriptor(
+        desc_, mode, relu_ceiling, 0, 0));
+    return desc_;
+  }
+
+ private:
+  miopenActivationDescriptor_t desc_;
+  DISABLE_COPY_AND_ASSIGN(ScopedActivationDescriptor);
 };
 
 inline bool CanMIOpenBeUsed(const framework::ExecutionContext& ctx) {
