@@ -36,6 +36,8 @@ endif()
 SET(OP_HEADER_DEPS xxhash)
 if (WITH_GPU)
     SET(OP_HEADER_DEPS ${OP_HEADER_DEPS} cub)
+elseif (WITH_AMD_GPU)
+    SET(OP_HEADER_DEPS ${OP_HEADER_DEPS} rocprim)
 endif()
 
 SET(OP_PREFETCH_DEPS "")
@@ -69,6 +71,8 @@ set(COMMON_OP_DEPS ${COMMON_OP_DEPS} sequence_padding sequence_scale cos_sim_fun
 set(COMMON_OP_DEPS ${COMMON_OP_DEPS} sequence2batch lstm_compute matrix_bit_code gru_compute activation_functions)
 if (WITH_GPU)
   set(COMMON_OP_DEPS ${COMMON_OP_DEPS} depthwise_conv prelu)
+elseif(WITH_AMD_GPU)
+  set(COMMON_OP_DEPS ${COMMON_OP_DEPS} depthwise_conv prelu)
 endif()
 
 # FIXME(typhoonzero): operator deps may not needed.
@@ -91,6 +95,7 @@ cc_test(strided_memcpy_test SRCS strided_memcpy_test.cc DEPS tensor memory)
 cc_test(save_load_op_test SRCS save_load_op_test.cc DEPS save_op load_op)
 cc_test(save_load_combine_op_test SRCS save_load_combine_op_test.cc DEPS save_combine_op load_combine_op)
 nv_test(dropout_op_test SRCS dropout_op_test.cc DEPS dropout_op tensor)
+hip_test(dropout_op_test SRCS dropout_op_test.cc DEPS dropout_op tensor)
 
 if (WITH_PYTHON)
   cc_library(py_func_op SRCS py_func_op.cc DEPS op_registry python pybind)
