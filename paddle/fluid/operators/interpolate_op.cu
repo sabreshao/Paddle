@@ -203,13 +203,13 @@ class InterpolateOpCUDAKernel : public framework::OpKernel<T> {
     grid_dim = grid_dim > 8 ? 8 : grid_dim;
 
     if ("nearest" == interp_method) {
-      KeNearestNeighborInterpFw<
-          T><<<grid_dim, 512, 0, ctx.cuda_device_context().stream()>>>(
+      hipLaunchKernelGGL((KeNearestNeighborInterpFw<
+          T>), dim3(grid_dim), dim3(512), 0, ctx.cuda_device_context().stream(),
           input_data, in_h, in_w, n, in_chw, output_data, out_h, out_w, n,
           out_chw, c, ratio_h, ratio_w);
     } else if ("bilinear" == interp_method) {
-      KeBilinearInterpFw<
-          T><<<grid_dim, 512, 0, ctx.cuda_device_context().stream()>>>(
+      hipLaunchKernelGGL((KeBilinearInterpFw<
+          T>), dim3(grid_dim), dim3(512), 0, ctx.cuda_device_context().stream(),
           input_data, in_h, in_w, n, in_chw, output_data, out_h, out_w, n,
           out_chw, c, ratio_h, ratio_w);
     }
@@ -267,13 +267,13 @@ class InterpolateGradOpCUDAKernel : public framework::OpKernel<T> {
     grid_dim = grid_dim > 8 ? 8 : grid_dim;
 
     if ("nearest" == interp_method) {
-      KeNearestNeighborInterpBw<
-          T><<<grid_dim, 512, 0, ctx.cuda_device_context().stream()>>>(
+      hipLaunchKernelGGL((KeNearestNeighborInterpBw<
+          T>), dim3(grid_dim), dim3(512), 0, ctx.cuda_device_context().stream(),
           input_grad_data, in_h, in_w, n, in_chw, output_grad_data, out_h,
           out_w, n, out_chw, c, ratio_h, ratio_w);
     } else if ("bilinear" == interp_method) {
-      KeBilinearInterpBw<
-          T><<<grid_dim, 512, 0, ctx.cuda_device_context().stream()>>>(
+      hipLaunchKernelGGL((KeBilinearInterpBw<
+          T>), dim3(grid_dim), dim3(512), 0, ctx.cuda_device_context().stream(),
           input_grad_data, in_h, in_w, n, in_chw, output_grad_data, out_h,
           out_w, n, out_chw, c, ratio_h, ratio_w);
     }

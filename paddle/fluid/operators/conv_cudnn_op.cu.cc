@@ -224,11 +224,9 @@ class CUDNNConvOpKernel : public framework::OpKernel<T> {
     }
 
     // get workspace size able to allocate
-    CUDNN_ENFORCE(platform::dynload::cudnnGetConvolutionForwardWorkspaceSize(
-        handle, cudnn_input_desc, cudnn_filter_desc, cudnn_conv_desc,
-        cudnn_output_desc, algo, &workspace_size_in_bytes));
-    // It is possible for float16 on Volta GPU to allocate more memory than
-    // the limit because the algo is overrided to use tensor core.
+    PADDLE_ENFORCE(platform::dynload::miopenConvolutionForwardGetWorkSpaceSize(
+        handle, cudnn_filter_desc, cudnn_input_desc, cudnn_conv_desc,
+        cudnn_output_desc, &workspace_size_in_bytes));
     PADDLE_ENFORCE_LE(workspace_size_in_bytes, workspace_size_limit,
                       "workspace_size to be allocated exceeds the limit");
 

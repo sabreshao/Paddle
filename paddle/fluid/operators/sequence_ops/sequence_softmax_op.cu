@@ -13,7 +13,13 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 #include <algorithm>
-#include <cub/cub.cuh>  // NOLINT
+#if defined(PADDLE_WITH_CUDA)
+#include <cub/cub.cuh>
+namespace gpuprim = ::cub;
+#elif defined(PADDLE_WITH_HIP)
+#include <hipcub/hipcub.hpp>
+namespace gpuprim = ::hipcub;
+#endif
 #include "paddle/fluid/operators/sequence_ops/sequence_softmax_op.h"
 
 namespace paddle {
@@ -25,7 +31,7 @@ __device__ __forceinline__ float real_exp(float x) { return expf(x); }
 __device__ __forceinline__ double real_exp(double x) { return exp(x); }
 
 template <typename T, int BlockDim>
-using BlockReduce = cub::BlockReduce<T, BlockDim>;
+using BlockReduce = gpuprim::BlockReduce<T, BlockDim>;
 
 template <typename T, int BlockDim>
 using BlockReduceTempStorage = typename BlockReduce<T, BlockDim>::TempStorage;
@@ -48,7 +54,7 @@ __global__ void sequence_softmax_kernel(const T *in_data, const size_t *ref_lod,
       max_ele = max_ele > ele ? max_ele : ele;
     }
     max_ele =
-        BlockReduce<T, BlockDim>(temp_storage).Reduce(max_ele, cub::Max());
+        BlockReduce<T, BlockDim>(temp_storage).Reduce(max_ele, gpuprim::Max());
     if (threadIdx.x == 0) {
       shared_max_data = max_ele;
     }
@@ -61,7 +67,7 @@ __global__ void sequence_softmax_kernel(const T *in_data, const size_t *ref_lod,
       sum_data += real_exp(ele - shared_max_data);
     }
     sum_data =
-        BlockReduce<T, BlockDim>(temp_storage).Reduce(sum_data, cub::Sum());
+        BlockReduce<T, BlockDim>(temp_storage).Reduce(sum_data, gpuprim::Sum());
     if (threadIdx.x == 0) {
       shared_sum_data = sum_data;
     }
@@ -96,7 +102,7 @@ __global__ void sequence_softmax_grad_kernel(const T *softmax_grad_data,
       T s_d = softmax_data[idx];
       result += s_g_d * s_d;
     }
-    result = BlockReduce<T, BlockDim>(temp_storage).Reduce(result, cub::Sum());
+    result = BlockReduce<T, BlockDim>(temp_storage).Reduce(result, gpuprim::Sum());
     if (threadIdx.x == 0) {
       shared_data = result;
     }
@@ -126,8 +132,8 @@ struct SequenceSoftmaxFunctor<platform::CUDADeviceContext, T> {
 
     dim3 block_size(thread_x);
     dim3 grid_size(max_blocks);
-    sequence_softmax_kernel<
-        T, kThreadsPerBlock><<<grid_size, block_size, 0, context.stream()>>>(
+    hipLaunchKernelGGL((sequence_softmax_kernel<
+        T, kThreadsPerBlock>), dim3(grid_size), dim3(block_size), 0, context.stream(),
         x.data<T>(), ref_lod.CUDAData(context.GetPlace()), hight,
         out->mutable_data<T>(context.GetPlace()));
   }
@@ -149,8 +155,8 @@ struct SequenceSoftmaxGradFunctor<platform::CUDADeviceContext, T> {
     dim3 block_size(thread_x);
     dim3 grid_size(max_blocks);
 
-    sequence_softmax_grad_kernel<
-        T, kThreadsPerBlock><<<grid_size, block_size, 0, context.stream()>>>(
+    hipLaunchKernelGGL((sequence_softmax_grad_kernel<
+        T, kThreadsPerBlock>), dim3(grid_size), dim3(block_size), 0, context.stream(),
         dout.data<T>(), out.data<T>(), ref_lod.CUDAData(context.GetPlace()),
         hight, dx->mutable_data<T>(context.GetPlace()));
   }

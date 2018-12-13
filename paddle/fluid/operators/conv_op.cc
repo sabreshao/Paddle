@@ -20,6 +20,9 @@ limitations under the License. */
 #ifdef PADDLE_WITH_CUDA
 #include "paddle/fluid/platform/cudnn_helper.h"
 #endif
+#ifdef PADDLE_WITH_HIP
+#include "paddle/fluid/platform/miopen_helper.h"
+#endif
 #ifdef PADDLE_WITH_MKLDNN
 #include "paddle/fluid/platform/mkldnn_helper.h"
 #endif
@@ -85,6 +88,11 @@ framework::OpKernelType ConvOp::GetExpectedKernelType(
 
 #ifdef PADDLE_WITH_CUDA
   if (platform::CanCUDNNBeUsed(ctx)) {
+    library = framework::LibraryType::kCUDNN;
+  }
+#endif
+#ifdef PADDLE_WITH_HIP
+  if (platform::CanMIOpenBeUsed(ctx)) {
     library = framework::LibraryType::kCUDNN;
   }
 #endif
@@ -395,6 +403,11 @@ framework::OpKernelType ConvOpGrad::GetExpectedKernelType(
 
 #ifdef PADDLE_WITH_CUDA
   if (platform::CanCUDNNBeUsed(ctx)) {
+    library_ = framework::LibraryType::kCUDNN;
+  }
+#endif
+#ifdef PADDLE_WITH_HIP
+  if (platform::CanMIOpenBeUsed(ctx)) {
     library_ = framework::LibraryType::kCUDNN;
   }
 #endif

@@ -22,14 +22,11 @@ REGISTER_OP_CUDA_KERNEL(
     ops::ElementwiseSubKernel<paddle::platform::CUDADeviceContext,
                               paddle::platform::float16>,
     ops::ElementwiseSubKernel<paddle::platform::CUDADeviceContext, double>,
-    ops::ElementwiseSubKernel<paddle::platform::CUDADeviceContext, int>,
-    ops::ElementwiseSubKernel<paddle::platform::CUDADeviceContext, int64_t>);
+    ops::ElementwiseSubKernel<paddle::platform::CUDADeviceContext, int>);
 REGISTER_OP_CUDA_KERNEL(
     elementwise_sub_grad,
     ops::ElementwiseSubGradKernel<paddle::platform::CUDADeviceContext, float>,
     ops::ElementwiseSubGradKernel<paddle::platform::CUDADeviceContext,
                                   paddle::platform::float16>,
     ops::ElementwiseSubGradKernel<paddle::platform::CUDADeviceContext, double>,
-    ops::ElementwiseSubGradKernel<paddle::platform::CUDADeviceContext, int>,
-    ops::ElementwiseSubGradKernel<paddle::platform::CUDADeviceContext,
-                                  int64_t>);
+    ops::ElementwiseSubGradKernel<paddle::platform::CUDADeviceContext, int>);

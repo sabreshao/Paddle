@@ -56,8 +56,8 @@ class ReduceMeanKernel : public framework::OpKernel<T> {
     }
 
     auto stream = context.cuda_device_context().stream();
-    TensorReduce<T, T, cub::Sum, DivideFunctor<T>>(
-        *input, output, reduce_dims, static_cast<T>(0), cub::Sum(),
+    TensorReduce<T, T, gpuprim::Sum, DivideFunctor<T>>(
+        *input, output, reduce_dims, static_cast<T>(0), gpuprim::Sum(),
         DivideFunctor<T>(reduce_num), stream);
   }
 };

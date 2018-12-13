@@ -12,6 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
+#include "hip/hip_runtime.h"
 #include "paddle/fluid/operators/detection/prior_box_op.h"
 
 namespace paddle {
@@ -19,7 +20,10 @@ namespace operators {
 
 template <typename T>
 __device__ inline T clip(T in) {
-  return min(max(in, 0.), 1.);
+  // return min(max(in, 0.), 1.);
+  if(in > 1.) return 1.;
+  else if (in < 0.) return 0.;
+  else return in;
 }
 
 template <typename T>
@@ -162,16 +166,16 @@ class PriorBoxOpCUDAKernel : public framework::OpKernel<T> {
       max_data = max.data<T>();
     }
 
-    GenPriorBox<T><<<grid, block, 0, stream>>>(
-        boxes->data<T>(), r.data<T>(), height, width, im_height, im_width,
-        aspect_ratios.size(), offset, step_width, step_height, min.data<T>(),
+    hipLaunchKernelGGL((GenPriorBox<T>), dim3(grid), dim3(block), 0, stream,
+        boxes->data<T>(), r.data<T>(), int(height), int(width), int(im_height), int(im_width),
+        int(aspect_ratios.size()), offset, step_width, step_height, min.data<T>(),
         max_data, min_num, clip, min_max_aspect_ratios_order);
 
     framework::Tensor v;
     framework::TensorFromVector(variances, ctx.device_context(), &v);
     grid = (box_num * 4 + block - 1) / block;
-    SetVariance<T><<<grid, block, 0, stream>>>(vars->data<T>(), v.data<T>(),
-                                               variances.size(), box_num * 4);
+    hipLaunchKernelGGL((SetVariance<T>), dim3(grid), dim3(block), 0, stream, vars->data<T>(), v.data<T>(),
+        int(variances.size()), box_num * 4);
   }
 };  // namespace operators
 

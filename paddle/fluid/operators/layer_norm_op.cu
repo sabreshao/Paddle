@@ -12,7 +12,13 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
+#if defined(PADDLE_WITH_CUDA)
 #include <cub/cub.cuh>
+namespace gpuprim = ::cub;
+#elif defined(PADDLE_WITH_HIP)
+#include <hipcub/hipcub.hpp>
+namespace gpuprim = ::hipcub;
+#endif
 #include "paddle/fluid/operators/layer_norm_op.h"
 
 namespace paddle {
@@ -67,7 +73,7 @@ template <typename T, int BlockDim>
 __global__ void LayerNormForward(const T *x, const T *scale, const T *bias,
                                  T *y, T *mean, T *var, float epsilon,
                                  int feature_size) {
-  using BlockReduce = cub::BlockReduce<PairForLayerNorm<double>, BlockDim>;
+  using BlockReduce = gpuprim::BlockReduce<PairForLayerNorm<T>, BlockDim>;
   __shared__ typename BlockReduce::TempStorage temp_storage;
 
   int beg_idx = blockIdx.x * feature_size + threadIdx.x;
@@ -82,8 +88,8 @@ __global__ void LayerNormForward(const T *x, const T *scale, const T *bias,
     var_val += (tmp * tmp);
   }
   auto pair = BlockReduce(temp_storage)
-                  .Reduce(PairForLayerNorm<double>(mean_val, var_val),
-                          PairForLayerNormAddFunctor<double>());
+                  .Reduce(PairForLayerNorm<T>(mean_val, var_val),
+                          PairForLayerNormAddFunctor<T>());
   if (threadIdx.x == 0) {
     auto tmp = pair.first_ / feature_size;
     mean[blockIdx.x] = static_cast<T>(tmp);
@@ -129,7 +135,7 @@ __global__ void LayerNormBackwardGradientAll(const T *x, const T *d_y,
                                              const T *mean, const T *var,
                                              const T *scale, float epsilon,
                                              int batch_size, int feature_size) {
-  using BlockReduce = cub::BlockReduce<PairForLayerNorm<T>, BlockDim>;
+  using BlockReduce = gpuprim::BlockReduce<PairForLayerNorm<T>, BlockDim>;
   __shared__ typename BlockReduce::TempStorage temp_storage;
 
   int beg_idx = threadIdx.x * feature_size + blockIdx.x;
@@ -166,7 +172,7 @@ __global__ void LayerNormBackwardGradientScaleOrBias(
     const T *x, const T *d_y, T *d_scale, T *d_bias, T *d_x, const T *mean,
     const T *var, const T *scale, float epsilon, int batch_size,
     int feature_size) {
-  using BlockReduce = cub::BlockReduce<T, BlockDim>;
+  using BlockReduce = gpuprim::BlockReduce<T, BlockDim>;
   __shared__ typename BlockReduce::TempStorage temp_storage;
   int beg_idx = threadIdx.x * feature_size + blockIdx.x;
   int end_idx = batch_size * feature_size + blockIdx.x;
@@ -192,7 +198,7 @@ __global__ void LayerNormBackwardGradientScaleOrBias(
   }
 
   d_scale_or_d_bias_partial =
-      BlockReduce(temp_storage).Reduce(d_scale_or_d_bias_partial, cub::Sum());
+      BlockReduce(temp_storage).Reduce(d_scale_or_d_bias_partial, gpuprim::Sum());
 
   if (threadIdx.x == 0) {
     if (HasDScale) {
@@ -209,7 +215,7 @@ __global__ void LayerNormBackwardPostProcessToCalculateDX(const T *x, T *d_x,
                                                           const T *var,
                                                           float epsilon,
                                                           int feature_size) {
-  using BlockReduce = cub::BlockReduce<PairForLayerNorm<T>, BlockDim>;
+  using BlockReduce = gpuprim::BlockReduce<PairForLayerNorm<T>, BlockDim>;
   __shared__ typename BlockReduce::TempStorage temp_storage;
   __shared__ T d_x_reduce_tmp[2];
 
@@ -250,7 +256,7 @@ __global__ void LayerNormBackwardGradientOnlyDX(const T *x, const T *d_y,
                                                 const T *var, const T *scale,
                                                 float epsilon,
                                                 int feature_size) {
-  using BlockReduce = cub::BlockReduce<PairForLayerNorm<T>, BlockDim>;
+  using BlockReduce = gpuprim::BlockReduce<PairForLayerNorm<T>, BlockDim>;
   __shared__ typename BlockReduce::TempStorage temp_storage;
   __shared__ T d_x_reduce_tmp[2];
 
@@ -317,7 +323,11 @@ template <typename T>
 static void LayerNormBackward(const T *x, const T *d_y, const T *scale,
                               const T *mean, const T *var, T *d_x, T *d_scale,
                               T *d_bias, float epsilon, int batch_size,
+#if defined(PADDLE_WITH_CUDA)
                               int feature_size, cudaStream_t stream) {
+#elif defined(PADDLE_WITH_HIP)
+                              int feature_size, hipStream_t stream) {
+#endif
   const int kMaxBlockDim = 512;
   int gradient_flag = ((d_x != nullptr ? 1 : 0) << 2) |
                       ((d_scale != nullptr ? 1 : 0) << 1) |
@@ -325,6 +335,7 @@ static void LayerNormBackward(const T *x, const T *d_y, const T *scale,
   if (gradient_flag == 0) return;
 
   if (batch_size == 1) {
+#if defined(PADDLE_WITH_CUDA)
     LayerNormBackwardWhenBatchSizeIsOne<
         T><<<(feature_size + kMaxBlockDim - 1) / kMaxBlockDim, kMaxBlockDim, 0,
              stream>>>(x, d_y, d_x, d_scale, d_bias, mean, var, scale, epsilon,
@@ -338,88 +349,175 @@ static void LayerNormBackward(const T *x, const T *d_y, const T *scale,
       }
     }
     return;
+#elif defined(PADDLE_WITH_HIP)
+   hipLaunchKernelGGL((LayerNormBackwardWhenBatchSizeIsOne<T>), dim3((feature_size + kMaxBlockDim - 1) / kMaxBlockDim),
+          dim3(kMaxBlockDim), 0, stream,
+          x, d_y, d_x, d_scale, d_bias, mean, var, scale, epsilon, feature_size );
+    if (d_x != nullptr) {
+      switch (GetDesiredBlockDim(feature_size)) {
+        FIXED_BLOCK_DIM_CASE(hipLaunchKernelGGL( (LayerNormBackwardPostProcessToCalculateDX<T, kBlockDim>), 
+                             dim3(1), dim3(kBlockDim), 0, stream,
+            x, d_x, mean, var, epsilon, feature_size ));
+      }
+    }
+    return;
+#endif
   }
 
   auto block_dim = GetDesiredBlockDim(batch_size);
   switch (gradient_flag) {
     case 1:  // d_x == nulptr, d_scale == nullptr, d_bias != nullptr
       switch (block_dim) {
+#if defined(PADDLE_WITH_CUDA)
         FIXED_BLOCK_DIM_CASE(LayerNormBackwardGradientScaleOrBias<
                              T, kBlockDim, false,
                              false><<<feature_size, kBlockDim, 0, stream>>>(
             x, d_y, d_scale, d_bias, d_x, mean, var, scale, epsilon, batch_size,
             feature_size));
+#elif defined(PADDLE_WITH_HIP)
+        FIXED_BLOCK_DIM_CASE(hipLaunchKernelGGL((LayerNormBackwardGradientScaleOrBias<
+                             T, kBlockDim, false, false>),
+                                      dim3(feature_size), dim3(kBlockDim), 0, stream,
+            x, d_y, d_scale, d_bias, d_x, mean, var, scale, epsilon, batch_size,
+            feature_size));
+#endif
       }
       break;
     case 2:  // d_x == nullptr, d_scale != nullptr, d_bias == nullptr
       switch (block_dim) {
+#if defined(PADDLE_WITH_CUDA)
         FIXED_BLOCK_DIM_CASE(LayerNormBackwardGradientScaleOrBias<
                              T, kBlockDim, false,
                              true><<<feature_size, kBlockDim, 0, stream>>>(
             x, d_y, d_scale, d_bias, d_x, mean, var, scale, epsilon, batch_size,
             feature_size));
+#elif defined(PADDLE_WITH_HIP)
+        FIXED_BLOCK_DIM_CASE(hipLaunchKernelGGL((LayerNormBackwardGradientScaleOrBias<
+                             T, kBlockDim, false, true>),
+                             dim3(feature_size), dim3(kBlockDim), 0, stream,
+            x, d_y, d_scale, d_bias, d_x, mean, var, scale, epsilon, batch_size,
+            feature_size));
+#endif
       }
       break;
     case 3:  // d_x == nullptr, d_scale != nulptr, d_bias != nullptr
       switch (block_dim) {
+#if defined(PADDLE_WITH_CUDA)
         FIXED_BLOCK_DIM_CASE(
             LayerNormBackwardGradientAll<
                 T, kBlockDim, false><<<feature_size, kBlockDim, 0, stream>>>(
                 x, d_y, d_scale, d_bias, d_x, mean, var, scale, epsilon,
                 batch_size, feature_size));
+#elif defined(PADDLE_WITH_HIP)
+        FIXED_BLOCK_DIM_CASE(
+            hipLaunchKernelGGL((LayerNormBackwardGradientAll<
+                T, kBlockDim, false>),dim3(feature_size), dim3(kBlockDim), 0, stream,
+                x, d_y, d_scale, d_bias, d_x, mean, var, scale, epsilon,
+                batch_size, feature_size));
+#endif
       }
       break;
     case 4:  // d_x != nullptr, d_scale == nullptr, d_bias == nullptr
       switch (GetDesiredBlockDim(feature_size)) {
+#if defined(PADDLE_WITH_CUDA)
         FIXED_BLOCK_DIM_CASE(
             LayerNormBackwardGradientOnlyDX<
                 T, kBlockDim><<<batch_size, kBlockDim, 0, stream>>>(
                 x, d_y, d_x, mean, var, scale, epsilon, feature_size));
+#elif defined(PADDLE_WITH_HIP)
+        FIXED_BLOCK_DIM_CASE(
+            hipLaunchKernelGGL((LayerNormBackwardGradientOnlyDX<
+                T, kBlockDim>), dim3(batch_size), dim3(kBlockDim), 0, stream,
+                x, d_y, d_x, mean, var, scale, epsilon, feature_size));
+#endif
       }
       break;
     case 5:  // d_x != nulptr, d_scale == nullptr, d_bias != nullptr
       switch (block_dim) {
+#if defined(PADDLE_WITH_CUDA)
         FIXED_BLOCK_DIM_CASE(LayerNormBackwardGradientScaleOrBias<
                              T, kBlockDim, true,
                              false><<<feature_size, kBlockDim, 0, stream>>>(
             x, d_y, d_scale, d_bias, d_x, mean, var, scale, epsilon, batch_size,
             feature_size));
+#elif defined(PADDLE_WITH_HIP)
+        FIXED_BLOCK_DIM_CASE(hipLaunchKernelGGL((LayerNormBackwardGradientScaleOrBias<
+                            T, kBlockDim, true,false>), dim3(feature_size), dim3(kBlockDim), 0, stream,
+            x, d_y, d_scale, d_bias, d_x, mean, var, scale, epsilon, batch_size,
+            feature_size));
+#endif
       }
       switch (GetDesiredBlockDim(feature_size)) {
+#if defined(PADDLE_WITH_CUDA)
         FIXED_BLOCK_DIM_CASE(
             LayerNormBackwardPostProcessToCalculateDX<
                 T, kBlockDim><<<batch_size, kBlockDim, 0, stream>>>(
                 x, d_x, mean, var, epsilon, feature_size));
+#elif defined(PADDLE_WITH_HIP)
+        FIXED_BLOCK_DIM_CASE(
+            hipLaunchKernelGGL((LayerNormBackwardPostProcessToCalculateDX<
+                T, kBlockDim>),dim3(batch_size), dim3(kBlockDim), 0, stream,
+                x, d_x, mean, var, epsilon, feature_size));
+#endif
       }
       break;
     case 6:  // d_x != nullptr, d_scale != nullptr, d_bias == nullptr
       switch (block_dim) {
+#if defined(PADDLE_WITH_CUDA)
         FIXED_BLOCK_DIM_CASE(LayerNormBackwardGradientScaleOrBias<
                              T, kBlockDim, true,
                              true><<<feature_size, kBlockDim, 0, stream>>>(
             x, d_y, d_scale, d_bias, d_x, mean, var, scale, epsilon, batch_size,
             feature_size));
+#elif defined(PADDLE_WITH_HIP)
+        FIXED_BLOCK_DIM_CASE(hipLaunchKernelGGL((LayerNormBackwardGradientScaleOrBias<
+                             T, kBlockDim, true,true>), dim3(feature_size), dim3(kBlockDim), 0, stream,
+            x, d_y, d_scale, d_bias, d_x, mean, var, scale, epsilon, batch_size,
+            feature_size));
+#endif
       }
       switch (GetDesiredBlockDim(feature_size)) {
+#if defined(PADDLE_WITH_CUDA)
         FIXED_BLOCK_DIM_CASE(
             LayerNormBackwardPostProcessToCalculateDX<
                 T, kBlockDim><<<batch_size, kBlockDim, 0, stream>>>(
                 x, d_x, mean, var, epsilon, feature_size));
+#elif defined(PADDLE_WITH_HIP)
+        FIXED_BLOCK_DIM_CASE(
+            hipLaunchKernelGGL((LayerNormBackwardPostProcessToCalculateDX<
+                T, kBlockDim>), dim3(batch_size), dim3(kBlockDim), 0, stream,
+                x, d_x, mean, var, epsilon, feature_size));
+#endif
       }
       break;
     case 7:  // d_x != nullptr, d_scale != nullptr, d_bias != nullptr
       switch (block_dim) {
+#if defined(PADDLE_WITH_CUDA)
         FIXED_BLOCK_DIM_CASE(
             LayerNormBackwardGradientAll<
                 T, kBlockDim, true><<<feature_size, kBlockDim, 0, stream>>>(
                 x, d_y, d_scale, d_bias, d_x, mean, var, scale, epsilon,
                 batch_size, feature_size));
+#elif defined(PADDLE_WITH_HIP)
+        FIXED_BLOCK_DIM_CASE(
+            hipLaunchKernelGGL((LayerNormBackwardGradientAll<
+                T, kBlockDim, true>), dim3(feature_size), dim3(kBlockDim), 0, stream,
+                x, d_y, d_scale, d_bias, d_x, mean, var, scale, epsilon,
+                batch_size, feature_size));
+#endif
       }
       switch (GetDesiredBlockDim(feature_size)) {
+#if defined(PADDLE_WITH_CUDA)
         FIXED_BLOCK_DIM_CASE(
             LayerNormBackwardPostProcessToCalculateDX<
                 T, kBlockDim><<<batch_size, kBlockDim, 0, stream>>>(
                 x, d_x, mean, var, epsilon, feature_size));
+#elif defined(PADDLE_WITH_HIP)
+        FIXED_BLOCK_DIM_CASE(
+            hipLaunchKernelGGL((LayerNormBackwardPostProcessToCalculateDX<
+                T, kBlockDim>), dim3(batch_size), dim3(kBlockDim), 0, stream,
+                x, d_x, mean, var, epsilon, feature_size));
+#endif
       }
       break;
     default:
@@ -457,10 +555,18 @@ class LayerNormKernel<platform::CUDADeviceContext, T>
     auto stream = ctx.cuda_device_context().stream();
 
     switch (GetDesiredBlockDim(feature_size)) {
+#if defined(PADDLE_WITH_CUDA)
       FIXED_BLOCK_DIM_CASE(
           LayerNormForward<T, kBlockDim><<<batch_size, kBlockDim, 0, stream>>>(
               x_data, scale_data, bias_data, y_data, mean_data, var_data,
               epsilon, feature_size));
+#elif defined(PADDLE_WITH_HIP)
+      FIXED_BLOCK_DIM_CASE(
+          hipLaunchKernelGGL((LayerNormForward<T, kBlockDim>),
+              dim3(batch_size), dim3(kBlockDim), 0, stream,
+              x_data, scale_data, bias_data, y_data, mean_data, var_data,
+              epsilon, feature_size));
+#endif
       default:
         PADDLE_THROW(
             "Product from begin_norm_axis to end must be larger than 1");
@@ -521,9 +627,7 @@ class LayerNormGradKernel<platform::CUDADeviceContext, T>
 namespace ops = paddle::operators;
 REGISTER_OP_CUDA_KERNEL(
     layer_norm,
-    ops::LayerNormKernel<paddle::platform::CUDADeviceContext, float>,
-    ops::LayerNormKernel<paddle::platform::CUDADeviceContext, double>);
+    ops::LayerNormKernel<paddle::platform::CUDADeviceContext, float>);
 REGISTER_OP_CUDA_KERNEL(
     layer_norm_grad,
-    ops::LayerNormGradKernel<paddle::platform::CUDADeviceContext, float>,
-    ops::LayerNormGradKernel<paddle::platform::CUDADeviceContext, double>);
+    ops::LayerNormGradKernel<paddle::platform::CUDADeviceContext, float>);

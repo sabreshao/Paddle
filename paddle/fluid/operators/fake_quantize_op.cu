@@ -65,9 +65,9 @@ struct FindAbsMaxFunctor<platform::CUDADeviceContext, T> {
     framework::Tensor max;
     T* max_data =
         max.mutable_data<T>(framework::make_ddim({grid}), ctx.GetPlace());
-    FindAbsMaxKernel<T><<<grid, block, 1024 * sizeof(T), ctx.stream()>>>(
+    hipLaunchKernelGGL((FindAbsMaxKernel<T>), dim3(grid), dim3(block), 1024 * sizeof(T), ctx.stream(),
         in, num, max_data);
-    FindAbsMaxKernel<T><<<1, block, 1024 * sizeof(T), ctx.stream()>>>(
+    hipLaunchKernelGGL((FindAbsMaxKernel<T>), dim3(1), dim3(block), 1024 * sizeof(T), ctx.stream(),
         max_data, grid, out);
   }
 };
@@ -128,7 +128,7 @@ struct FindRangeAbsMaxFunctor<platform::CUDADeviceContext, T> {
     int* find_max = need_find_max.mutable_data<int>(gpu_place);
     int* out_size_data = out_size.mutable_data<int>(gpu_place);
 
-    FindRangeAbsMaxAndFillArray<T><<<1, 1, 0, ctx.stream()>>>(
+    hipLaunchKernelGGL((FindRangeAbsMaxAndFillArray<T>), dim3(1), dim3(1), 0, ctx.stream(),
         cur_scale.data<T>(), last_scale.data<T>(), iter.data<int64_t>(),
         window_size, scale_arr, out_scale_data, find_max, out_size_data);
 
@@ -160,7 +160,7 @@ struct ClipAndFakeQuantFunctor<platform::CUDADeviceContext, T> {
     const T* scale_data = scale.data<T>();
     T* out_data = out->mutable_data<T>(ctx.GetPlace());
 
-    ClipAndQuantKernel<T><<<grid, block, 0, ctx.stream()>>>(
+    hipLaunchKernelGGL((ClipAndQuantKernel<T>), dim3(grid), dim3(block), 0, ctx.stream(),
         in_data, scale_data, bin_cnt, num, out_data);
   }
 };

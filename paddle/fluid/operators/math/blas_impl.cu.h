@@ -15,7 +15,8 @@
 #pragma once
 
 #include "paddle/fluid/operators/math/math_function.h"
-#include "paddle/fluid/platform/dynload/cublas.h"
+#include "paddle/fluid/platform/dynload/hipblas.h"
+//#include "paddle/fluid/platform/dynload/cublas.h"
 #include "paddle/fluid/platform/gpu_info.h"
 
 DECLARE_bool(enable_cublas_tensor_op_math);
@@ -31,40 +32,37 @@ template <>
 struct CUBlas<float> {
   template <typename... ARGS>
   static void GEMM(ARGS... args) {
-    PADDLE_ENFORCE(platform::dynload::cublasSgemm(args...));
+    PADDLE_ENFORCE(platform::dynload::hipblasSgemm(args...));
   }
 
   template <typename... ARGS>
   static void AXPY(ARGS... args) {
-    PADDLE_ENFORCE(platform::dynload::cublasSaxpy(args...));
+    PADDLE_ENFORCE(platform::dynload::hipblasSaxpy(args...));
   }
 
   template <typename... ARGS>
   static void GEMV(ARGS... args) {
-    PADDLE_ENFORCE(platform::dynload::cublasSgemv(args...));
+    PADDLE_ENFORCE(platform::dynload::hipblasSgemv(args...));
   }
 
   template <typename... ARGS>
   static void GEMM_STRIDED_BATCH(ARGS... args) {
-#if CUDA_VERSION >= 8000
-    PADDLE_ENFORCE(platform::dynload::cublasSgemmStridedBatched(args...));
-#else
-    PADDLE_THROW("SgemmStridedBatched is not supported on cuda <= 7.5");
-#endif
+    PADDLE_ENFORCE(platform::dynload::hipblasSgemmStridedBatched(args...));
   }
 
   // NOTES: GEMM_EX can use Tensor Core to accelerate matrix multiply.
   // https://docs.nvidia.com/cuda/cublas/index.html#cublassetmathmode
   template <typename... ARGS>
   static void GEMM_EX(platform::CUDADeviceContext *dev_ctx,
-                      cublasOperation_t transa, cublasOperation_t transb, int m,
+                      hipblasOperation_t transa, hipblasOperation_t transb, int m,
                       int n, int k, const float *alpha, const void *A,
-                      cudaDataType_t Atype, int lda, const void *B,
-                      cudaDataType_t Btype, int ldb, const float *beta, void *C,
-                      cudaDataType_t Ctype, int ldc) {
+                      miopenDataType_t Atype, int lda, const void *B,
+                      miopenDataType_t Btype, int ldb, const float *beta, void *C,
+                      miopenDataType_t Ctype, int ldc) {
 // Because the gcc 4.8 doesn't expand template parameter pack that
 // appears in a lambda-expression, I can not use template parameter pack
 // here.
+    auto cublas_call = [&]() {
 #if CUDA_VERSION >= 8000
     VLOG(5) << "use_tensor_op_math: "
             << (dev_ctx->tensor_core_available() ? "True" : "False");
@@ -83,26 +81,22 @@ template <>
 struct CUBlas<double> {
   template <typename... ARGS>
   static void GEMM(ARGS... args) {
-    PADDLE_ENFORCE(platform::dynload::cublasDgemm(args...));
+    PADDLE_ENFORCE(platform::dynload::hipblasDgemm(args...));
   }
 
   template <typename... ARGS>
   static void AXPY(ARGS... args) {
-    PADDLE_ENFORCE(platform::dynload::cublasDaxpy(args...));
+    PADDLE_ENFORCE(platform::dynload::hipblasDaxpy(args...));
   }
 
   template <typename... ARGS>
   static void GEMV(ARGS... args) {
-    PADDLE_ENFORCE(platform::dynload::cublasDgemv(args...));
+    PADDLE_ENFORCE(platform::dynload::hipblasDgemv(args...));
   }
 
   template <typename... ARGS>
   static void GEMM_STRIDED_BATCH(ARGS... args) {
-#if CUDA_VERSION >= 8000
-    PADDLE_ENFORCE(platform::dynload::cublasDgemmStridedBatched(args...));
-#else
-    PADDLE_THROW("DgemmStridedBatched is not supported on cuda <= 7.5");
-#endif
+    PADDLE_ENFORCE(platform::dynload::hipblasDgemmStridedBatched(args...));
   }
 
   template <typename... ARGS>
@@ -111,22 +105,23 @@ struct CUBlas<double> {
   }
 };
 
+#if 0
 template <>
 struct CUBlas<platform::float16> {
   using float16 = platform::float16;
 
-  static void GEMM(cublasHandle_t handle, cublasOperation_t transa,
-                   cublasOperation_t transb, int m, int n, int k,
+  static void GEMM(hipblasHandle_t handle, hipblasOperation_t transa,
+                   hipblasOperation_t transb, int m, int n, int k,
                    const float16 *alpha, const float16 *A, int lda,
                    const float16 *B, int ldb, const float16 *beta, float16 *C,
                    int ldc) {
     PADDLE_ENFORCE(
-        platform::dynload::cublasHgemm(handle, transa, transb, m, n, k,
-                                       reinterpret_cast<const __half *>(alpha),
-                                       reinterpret_cast<const __half *>(A), lda,
-                                       reinterpret_cast<const __half *>(B), ldb,
-                                       reinterpret_cast<const __half *>(beta),
-                                       reinterpret_cast<__half *>(C), ldc));
+        platform::dynload::hipblasHgemm(handle, transa, transb, m, n, k,
+                                       reinterpret_cast<const hipblasHalf *>(alpha),
+                                       reinterpret_cast<const hipblasHalf *>(A), lda,
+                                       reinterpret_cast<const hipblasHalf *>(B), ldb,
+                                       reinterpret_cast<const hipblasHalf *>(beta),
+                                       reinterpret_cast<const hipblasHalf *>(C), ldc));
   }
 
   static void GEMM_STRIDED_BATCH(cublasHandle_t handle,
@@ -182,7 +177,8 @@ struct CUBlas<platform::float16> {
     PADDLE_THROW("cublasGemmEx is supported on cuda >= 8.0");
 #endif
   }
-};
+}cudaDataType_t;
+#endif
 
 template <>
 template <typename T>
@@ -190,14 +186,14 @@ void Blas<platform::CUDADeviceContext>::GEMM(CBLAS_TRANSPOSE transA,
                                              CBLAS_TRANSPOSE transB, int M,
                                              int N, int K, T alpha, const T *A,
                                              const T *B, T beta, T *C) const {
-  // Note that cublas follows fortran order, so the order is different from
+  // Note that hipblas follows fortran order, so the order is different from
   // the cblas convention.
   int lda = (transA == CblasNoTrans) ? K : M;
   int ldb = (transB == CblasNoTrans) ? N : K;
-  cublasOperation_t cuTransA =
-      (transA == CblasNoTrans) ? CUBLAS_OP_N : CUBLAS_OP_T;
-  cublasOperation_t cuTransB =
-      (transB == CblasNoTrans) ? CUBLAS_OP_N : CUBLAS_OP_T;
+  hipblasOperation_t cuTransA =
+      (transA == CblasNoTrans) ? HIPBLAS_OP_N : HIPBLAS_OP_T;
+  hipblasOperation_t cuTransB =
+      (transB == CblasNoTrans) ? HIPBLAS_OP_N : HIPBLAS_OP_T;
 
 #if CUDA_VERSION >= 8000
   if (FLAGS_enable_cublas_tensor_op_math && std::is_same<T, float>::value) {
@@ -217,6 +213,7 @@ void Blas<platform::CUDADeviceContext>::GEMM(CBLAS_TRANSPOSE transA,
 #endif  // CUDA_VERSION >= 8000
 }
 
+#if 0
 template <>
 template <>
 inline void Blas<platform::CUDADeviceContext>::GEMM(
@@ -224,14 +221,14 @@ inline void Blas<platform::CUDADeviceContext>::GEMM(
     platform::float16 alpha, const platform::float16 *A,
     const platform::float16 *B, platform::float16 beta,
     platform::float16 *C) const {
-  // Note that cublas follows fortran order, so the order is different from
+  // Note that hipblas follows fortran order, so the order is different from
   // the cblas convention.
   int lda = (transA == CblasNoTrans) ? K : M;
   int ldb = (transB == CblasNoTrans) ? N : K;
-  cublasOperation_t cuTransA =
-      (transA == CblasNoTrans) ? CUBLAS_OP_N : CUBLAS_OP_T;
-  cublasOperation_t cuTransB =
-      (transB == CblasNoTrans) ? CUBLAS_OP_N : CUBLAS_OP_T;
+  hipblasOperation_t cuTransA =
+      (transA == CblasNoTrans) ? HIPBLAS_OP_N : HIPBLAS_OP_T;
+  hipblasOperation_t cuTransB =
+      (transB == CblasNoTrans) ? HIPBLAS_OP_N : HIPBLAS_OP_T;
 
   // TODO(kexinzhao): add processing code for compute capability < 53 case
   PADDLE_ENFORCE_GE(context_.GetComputeCapability(), 53,
@@ -259,6 +256,7 @@ inline void Blas<platform::CUDADeviceContext>::GEMM(
   });
 #endif  // CUDA_VERSION >= 8000
 }
+#endif
 
 template <>
 template <typename T>
@@ -266,10 +264,10 @@ void Blas<platform::CUDADeviceContext>::GEMM(bool transA, bool transB, int M,
                                              int N, int K, T alpha, const T *A,
                                              int lda, const T *B, int ldb,
                                              T beta, T *C, int ldc) const {
-  // Note that cublas follows fortran order, so the order is different from
+  // Note that hipblas follows fortran order, so the order is different from
   // the cblas convention.
-  cublasOperation_t cuTransA = transA ? CUBLAS_OP_T : CUBLAS_OP_N;
-  cublasOperation_t cuTransB = transB ? CUBLAS_OP_T : CUBLAS_OP_N;
+  hipblasOperation_t cuTransA = transA ? HIPBLAS_OP_T : HIPBLAS_OP_N;
+  hipblasOperation_t cuTransB = transB ? HIPBLAS_OP_T : HIPBLAS_OP_N;
 
 #if CUDA_VERSION >= 8000
   if (FLAGS_enable_cublas_tensor_op_math && std::is_same<T, float>::value) {
@@ -290,6 +288,7 @@ void Blas<platform::CUDADeviceContext>::GEMM(bool transA, bool transB, int M,
 #endif  // CUDA_VERSION >= 8000
 }
 
+#if 0
 template <>
 template <>
 inline void Blas<platform::CUDADeviceContext>::GEMM(
@@ -298,14 +297,15 @@ inline void Blas<platform::CUDADeviceContext>::GEMM(
     platform::float16 beta, platform::float16 *C, int ldc) const {
   // Note that cublas follows fortran order, so the order is different from
   // the cblas convention.
-  cublasOperation_t cuTransA = transA ? CUBLAS_OP_T : CUBLAS_OP_N;
-  cublasOperation_t cuTransB = transB ? CUBLAS_OP_T : CUBLAS_OP_N;
+  hipblasOperation_t cuTransA = transA ? HIPBLAS_OP_T : HIPBLAS_OP_N;
+  hipblasOperation_t cuTransB = transB ? HIPBLAS_OP_T : HIPBLAS_OP_N;
 
   context_.CublasCall([&](cublasHandle_t handle) {
     CUBlas<platform::float16>::GEMM(handle, cuTransB, cuTransA, N, M, K, &alpha,
                                     B, ldb, A, lda, &beta, C, ldc);
   });
 }
+#endif
 
 template <>
 template <typename T>
@@ -321,7 +321,7 @@ template <typename T>
 void Blas<platform::CUDADeviceContext>::GEMV(bool trans_a, int M, int N,
                                              T alpha, const T *A, const T *B,
                                              T beta, T *C) const {
-  cublasOperation_t cuTransA = !trans_a ? CUBLAS_OP_T : CUBLAS_OP_N;
+  hipblasOperation_t cuTransA = !trans_a ? HIPBLAS_OP_T : HIPBLAS_OP_N;
 
   context_.CublasCall([&](cublasHandle_t handle) {
     CUBlas<T>::GEMV(handle, cuTransA, N, M, &alpha, A, N, B, 1, &beta, C, 1);
@@ -334,15 +334,15 @@ void Blas<platform::CUDADeviceContext>::BatchedGEMM(
     CBLAS_TRANSPOSE transA, CBLAS_TRANSPOSE transB, int M, int N, int K,
     T alpha, const T *A, const T *B, T beta, T *C, int batchCount,
     int64_t strideA, int64_t strideB) const {
-  // Note that cublas follows fortran order, so the order is different from
+  // Note that hipblas follows fortran order, so the order is different from
   // the cblas convention.
   int lda = (transA == CblasNoTrans) ? K : M;
   int ldb = (transB == CblasNoTrans) ? N : K;
   int ldc = N;
-  cublasOperation_t cuTransA =
-      (transA == CblasNoTrans) ? CUBLAS_OP_N : CUBLAS_OP_T;
-  cublasOperation_t cuTransB =
-      (transB == CblasNoTrans) ? CUBLAS_OP_N : CUBLAS_OP_T;
+  hipblasOperation_t cuTransA =
+      (transA == CblasNoTrans) ? HIPBLAS_OP_N : HIPBLAS_OP_T;
+  hipblasOperation_t cuTransB =
+      (transB == CblasNoTrans) ? HIPBLAS_OP_N : HIPBLAS_OP_T;
   const int64_t strideC = M * N;
 
 #if CUDA_VERSION >= 9010

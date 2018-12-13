@@ -13,6 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 #pragma once
+#include "hip/hip_runtime.h"
 #include "paddle/fluid/framework/tensor.h"
 #include "paddle/fluid/platform/place.h"
 
@@ -71,10 +72,8 @@ void GPUScatterAssign(const platform::DeviceContext& ctx, const Tensor& src,
   int n = slice_size * index_size;
   int grid = (n + block - 1) / block;
 
-  ScatterCUDAKernel<T><<<
-      grid, block, 0,
-      reinterpret_cast<const platform::CUDADeviceContext&>(ctx).stream()>>>(
-      p_src, p_index, p_output, index_size, slice_size);
+  hipLaunchKernelGGL((ScatterCUDAKernel<T>), dim3(grid), dim3(block), 0, reinterpret_cast<const platform::CUDADeviceContext&>(ctx).stream(), 
+      p_src, p_index, p_output, size_t(index_size), size_t(slice_size));
 }
 
 }  // namespace operators

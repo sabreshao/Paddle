@@ -15,6 +15,12 @@ limitations under the License. */
 #ifdef PADDLE_WITH_CUDA
 #include <nccl.h>
 #endif
+
+#ifdef PADDLE_WITH_HIP
+#include <rccl.h>
+#endif
+
+#include <sys/time.h>
 #include <thread>  // NOLINT
 
 #include "paddle/fluid/framework/data_type.h"

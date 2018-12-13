@@ -20,7 +20,13 @@
 #include <set>
 #include <vector>
 
-#include <cub/cub.cuh>  // NOLINT
+#if defined(PADDLE_WITH_CUDA)
+#include <cub/cub.cuh>
+namespace gpuprim = ::cub;
+#elif defined(PADDLE_WITH_HIP)
+#include <hipcub/hipcub.hpp>
+namespace gpuprim = ::hipcub;
+#endif
 #include "paddle/fluid/framework/tensor.h"
 #include "paddle/fluid/framework/tensor_util.h"
 
@@ -60,7 +66,7 @@ template <typename Tx, typename Ty, typename ReduceOp, typename TransformOp,
 __global__ void ReduceKernel2D(const Tx* x, Ty* y, ReduceOp reducer,
                                TransformOp transformer, Ty init,
                                int reduce_num) {
-  __shared__ typename cub::BlockReduce<Ty, BlockDim>::TempStorage temp_storage;
+  __shared__ typename gpuprim::BlockReduce<Ty, BlockDim>::TempStorage temp_storage;
   int idx_x = blockIdx.x * reduce_num;
   int idx_y = threadIdx.x;
   Ty reduce_var = init;
@@ -68,7 +74,7 @@ __global__ void ReduceKernel2D(const Tx* x, Ty* y, ReduceOp reducer,
     reduce_var = reducer(reduce_var, transformer(x[idx_x + idx_y]));
 
   reduce_var =
-      cub::BlockReduce<Ty, BlockDim>(temp_storage).Reduce(reduce_var, reducer);
+      gpuprim::BlockReduce<Ty, BlockDim>(temp_storage).Reduce(reduce_var, reducer);
 
   if (threadIdx.x == 0) {
     y[blockIdx.x] = reduce_var;
@@ -84,7 +90,7 @@ __global__ void ReduceKernel(const Tx* x, Ty* y, ReduceOp reducer,
                              Array<int, ReduceRank> reduce_strides,
                              Array<int, Rank - ReduceRank> left_dim,
                              Array<int, Rank - ReduceRank> left_strides) {
-  __shared__ typename cub::BlockReduce<Ty, BlockDim>::TempStorage temp_storage;
+  __shared__ typename gpuprim::BlockReduce<Ty, BlockDim>::TempStorage temp_storage;
   Array<int, Rank> sub_index;
   int left_idx = blockIdx.x;
   for (int i = 0; i < Rank - ReduceRank; ++i) {
@@ -115,7 +121,7 @@ __global__ void ReduceKernel(const Tx* x, Ty* y, ReduceOp reducer,
   }
 
   reduce_var =
-      cub::BlockReduce<Ty, BlockDim>(temp_storage).Reduce(reduce_var, reducer);
+      gpuprim::BlockReduce<Ty, BlockDim>(temp_storage).Reduce(reduce_var, reducer);
 
   if (threadIdx.x == 0) {
     y[blockIdx.x] = reduce_var;
@@ -161,7 +167,7 @@ static void TensorReduceImpl(
     int left_num, int reduce_num, const std::vector<int>& x_strides,
     const std::vector<int>& reduce_dim, const std::vector<int>& reduce_strides,
     const std::vector<int>& left_dim, const std::vector<int>& left_strides,
-    cudaStream_t stream) {
+    hipStream_t stream) {
 #define CUB_RANK_CASE(i, ...)             \
   case i: {                               \
     constexpr auto kRank = i;             \
@@ -171,8 +177,8 @@ static void TensorReduceImpl(
 #define CUB_REDUCE_RANK_CASE(i, ...)                              \
   case i: {                                                       \
     constexpr auto kReduceRank = i;                               \
-    ReduceKernel<Tx, Ty, ReduceOp, TransformOp, BlockDim, kRank,  \
-                 kReduceRank><<<left_num, BlockDim, 0, stream>>>( \
+    hipLaunchKernelGGL((ReduceKernel<Tx, Ty, ReduceOp, TransformOp, BlockDim, kRank,  \
+                 kReduceRank>), dim3(left_num), dim3(BlockDim), 0, stream, \
         x_data, y_data, reducer, transformer, init, reduce_num,   \
         Array<int, kRank>::From(x_strides),                       \
         Array<int, kReduceRank>::From(reduce_dim),                \
@@ -184,22 +190,22 @@ static void TensorReduceImpl(
   int rank = x_strides.size();
   int reduce_rank = reduce_strides.size();
   if (rank == reduce_rank) {
-    cub::TransformInputIterator<Ty, TransformOp, const Tx*> trans_x(
+    gpuprim::TransformInputIterator<Ty, TransformOp, const Tx*> trans_x(
         x_data, transformer);
     size_t temp_storage_bytes = 0;
-    cub::DeviceReduce::Reduce(nullptr, temp_storage_bytes, trans_x, y_data,
+    gpuprim::DeviceReduce::Reduce(nullptr, temp_storage_bytes, trans_x, y_data,
                               reduce_num, reducer, init, stream);
     framework::Tensor tmp;
     auto* temp_storage = tmp.mutable_data<uint8_t>(
         framework::make_ddim({static_cast<int64_t>(temp_storage_bytes)}),
         place);
-    cub::DeviceReduce::Reduce(temp_storage, temp_storage_bytes, trans_x, y_data,
+    gpuprim::DeviceReduce::Reduce(temp_storage, temp_storage_bytes, trans_x, y_data,
                               reduce_num, reducer, init, stream);
     return;
   }
   if (rank == 2 && reduce_rank == 1 && reduce_dim[0] == 1) {
-    ReduceKernel2D<Tx, Ty, ReduceOp, TransformOp,
-                   BlockDim><<<left_num, BlockDim, 0, stream>>>(
+    hipLaunchKernelGGL((ReduceKernel2D<Tx, Ty, ReduceOp, TransformOp,
+                   BlockDim>), dim3(left_num), dim3(BlockDim), 0, stream,
         x_data, y_data, reducer, transformer, init, reduce_num);
     return;
   }
@@ -250,7 +256,7 @@ template <typename Tx, typename Ty, typename ReduceOp, typename TransformOp>
 void TensorReduce(const framework::Tensor& x, framework::Tensor* y,
                   std::vector<int> origin_reduce_dims, const Ty& init,
                   const ReduceOp& reducer, const TransformOp& transformer,
-                  cudaStream_t stream) {
+                  hipStream_t stream) {
   auto x_dim = framework::vectorize2int(x.dims());
   std::vector<int> new_x_dim, new_reduce_dims;
   int is_reduced = 0;

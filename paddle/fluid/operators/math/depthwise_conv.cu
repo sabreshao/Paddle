@@ -13,6 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 #include <algorithm>
+#include "hip/hip_runtime.h"
 #include <vector>
 #include "paddle/fluid/operators/math/depthwise_conv.h"
 #include "paddle/fluid/platform/cuda_primitives.h"
@@ -456,8 +457,8 @@ class DepthwiseConvFunctor<platform::CUDADeviceContext, T> {
           stride_height == stride_width && stride_height == c_stride &&      \
           (ksize_height == ksize_width && ksize_height == c_filter ||        \
            c_filter == -1)) {                                                \
-    KernelDepthwiseConvSp<T, c_filter_multiplier, c_stride,                  \
-                          c_filter><<<grid, threads, 0, context.stream()>>>( \
+    hipLaunchKernelGGL((KernelDepthwiseConvSp<T, c_filter_multiplier, c_stride,       \
+                          c_filter>), dim3(grid), dim3(threads), 0, context.stream(), \
         input_data, filter_data, batch_size, output_channels, output_height, \
         output_width, input_channels, input_height, input_width,             \
         filter_multiplier, ksize_height, ksize_width, stride_height,         \
@@ -523,9 +524,9 @@ class DepthwiseConvInputGradFunctor<platform::CUDADeviceContext, T> {
           stride_height == stride_width && stride_height == c_stride && \
           (ksize_height == ksize_width && ksize_height == c_filter ||   \
            c_filter == -1)) {                                           \
-    KernelDepthwiseConvInputGradSp<                                     \
+    hipLaunchKernelGGL((KernelDepthwiseConvInputGradSp<                 \
         T, c_filter_multiplier, c_stride,                               \
-        c_filter><<<grid, threads, 0, context.stream()>>>(              \
+        c_filter>), dim3(grid), dim3(threads), 0, context.stream(),     \
         output_grad_data, filter_data, batch_size, output_channels,     \
         output_height, output_width, input_channels, input_height,      \
         input_width, filter_multiplier, ksize_height, ksize_width,      \
@@ -591,8 +592,8 @@ class DepthwiseConvFilterGradFunctor<platform::CUDADeviceContext, T> {
 
 #define check_case(c_filter_multiplier)                                       \
   if (c_filter_multiplier == 0 || c_filter_multiplier == filter_multiplier) { \
-    KernelDepthwiseConvFilterGradSp<                                          \
-        T, c_filter_multiplier><<<grid, threads, 0, context.stream()>>>(      \
+    hipLaunchKernelGGL((KernelDepthwiseConvFilterGradSp<                              \
+        T, c_filter_multiplier>), dim3(grid), dim3(threads), 0, context.stream(),     \
         output_grad_data, input_data, batch_size, output_channels,            \
         output_height, output_width, input_channels, input_height,            \
         input_width, filter_multiplier, ksize_height, ksize_width,            \

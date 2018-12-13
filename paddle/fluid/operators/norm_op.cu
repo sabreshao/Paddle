@@ -13,7 +13,13 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 #include <algorithm>
-#include "cub/cub.cuh"
+#if defined(PADDLE_WITH_CUDA)
+#include <cub/cub.cuh>	#include <cub/cub.cuh>
+namespace gpuprim = ::cub;
+#elif defined(PADDLE_WITH_HIP)
+#include <hipcub/hipcub.hpp>
+namespace gpuprim = ::hipcub;
+#endif
 #include "paddle/fluid/operators/norm_op.h"
 
 namespace paddle {
@@ -27,7 +33,7 @@ template <typename T, int BlockDim>
 __global__ void Normalize(const T* x, const int pre,
                           const int axis_n,  // dim in axis
                           const int post, const T eps, T* y, T* out_norm) {
-  typedef cub::BlockReduce<T, BlockDim> BlockReduce;
+  typedef gpuprim::BlockReduce<T, BlockDim> BlockReduce;
   __shared__ typename BlockReduce::TempStorage temp_storage;
   int num = pre * post;
   for (int i = blockIdx.x; i < num; i += gridDim.x) {
@@ -78,7 +84,7 @@ class NormCUDAKernel : public framework::OpKernel<T> {
     int max_threads = dev_ctx.GetMaxPhysicalThreadCount();
     const int max_blocks = std::max(max_threads / block, 1);
     int grid = std::min(max_blocks, pre * post);
-    Normalize<T, block><<<grid, block, 0, dev_ctx.stream()>>>(x, pre, n, post,
+    hipLaunchKernelGGL((Normalize<T, block>), dim3(grid), dim3(block), 0, dev_ctx.stream(), x, pre, n, post,
                                                               eps, y, norm);
   }
 };
@@ -87,7 +93,7 @@ template <typename T, int BlockDim>
 __global__ void NormalizeGradient(const T* x, const T* x_norm, const T* y_grad,
                                   const int pre, const int axis_n,
                                   const int post, T* x_grad) {
-  typedef cub::BlockReduce<T, BlockDim> BlockReduce;
+  typedef gpuprim::BlockReduce<T, BlockDim> BlockReduce;
   __shared__ typename BlockReduce::TempStorage temp_storage_sum;
   int num = pre * post;
   for (int i = blockIdx.x; i < num; i += gridDim.x) {
@@ -144,7 +150,7 @@ class NormGradCUDAKernel : public framework::OpKernel<T> {
     int max_threads = dev_ctx.GetMaxPhysicalThreadCount();
     const int max_blocks = std::max(max_threads / block, 1);
     int grid = std::min(max_blocks, pre * post);
-    NormalizeGradient<T, block><<<grid, block, 0, dev_ctx.stream()>>>(
+    hipLaunchKernelGGL((NormalizeGradient<T, block>), dim3(grid), dim3(block), 0, dev_ctx.stream(),
         x, x_norm, dy, pre, n, post, dx);
   }
 };

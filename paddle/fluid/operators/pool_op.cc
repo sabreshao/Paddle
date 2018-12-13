@@ -16,6 +16,9 @@ limitations under the License. */
 #ifdef PADDLE_WITH_CUDA
 #include "paddle/fluid/platform/cudnn_helper.h"
 #endif
+#ifdef PADDLE_WITH_HIP
+#include "paddle/fluid/platform/miopen_helper.h"
+#endif
 #ifdef PADDLE_WITH_MKLDNN
 #include "paddle/fluid/platform/mkldnn_helper.h"
 #endif
@@ -96,6 +99,11 @@ framework::OpKernelType PoolOp::GetExpectedKernelType(
     library_ = framework::LibraryType::kCUDNN;
   }
 #endif
+#ifdef PADDLE_WITH_HIP
+  if (platform::CanMIOpenBeUsed(ctx)) {
+    library_ = framework::LibraryType::kCUDNN;
+  }
+#endif
 #ifdef PADDLE_WITH_MKLDNN
   if (library_ == framework::LibraryType::kPlain &&
       platform::CanMKLDNNBeUsed(ctx)) {
@@ -123,6 +131,11 @@ framework::OpKernelType PoolOpGrad::GetExpectedKernelType(
 
 #ifdef PADDLE_WITH_CUDA
   if (platform::CanCUDNNBeUsed(ctx)) {
+    library_ = framework::LibraryType::kCUDNN;
+  }
+#endif
+#ifdef PADDLE_WITH_HIP
+  if (platform::CanMIOpenBeUsed(ctx)) {
     library_ = framework::LibraryType::kCUDNN;
   }
 #endif

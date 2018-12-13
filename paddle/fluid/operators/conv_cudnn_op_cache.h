@@ -17,15 +17,16 @@ limitations under the License. */
 #include <functional>
 #include <unordered_map>
 #include <vector>
-#ifdef PADDLE_WITH_HIP
-#include "paddle/fluid/platform/miopen_helper.h"
-#else
-#include "paddle/fluid/platform/cudnn_helper.h"
-#endif
 
 DECLARE_uint64(conv_workspace_size_limit);
 DECLARE_bool(cudnn_exhaustive_search);
 DECLARE_int64(cudnn_exhaustive_search_times);
+#ifdef PADDLE_WITH_CUDA
+#include "paddle/fluid/platform/cudnn_helper.h"
+#endif
+#ifdef PADDLE_WITH_HIP
+#include "paddle/fluid/platform/miopen_helper.h"
+#endif
 
 namespace paddle {
 namespace operators {

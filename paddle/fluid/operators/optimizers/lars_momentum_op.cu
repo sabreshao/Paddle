@@ -14,6 +14,7 @@ limitations under the License. */
 
 #include "paddle/fluid/framework/op_registry.h"
 #include "paddle/fluid/operators/optimizers/lars_momentum_op.h"
+#include <hip/hip_runtime.h>
 
 namespace paddle {
 namespace operators {
@@ -78,7 +79,7 @@ class LarsMomentumOpCUDAKernel : public framework::OpKernel<T> {
     auto* place = ctx.template device_context<DeviceContext>().eigen_device();
     ep_norm.device(*place) = eigen_p.square().sum().sqrt();
     eg_norm.device(*place) = eigen_g.square().sum().sqrt();
-    MomentumLarsKernel<<<grid, block, 0, ctx.cuda_device_context().stream()>>>(
+    hipLaunchKernelGGL((MomentumLarsKernel<T>), dim3(grid), dim3(block), 0, ctx.cuda_device_context().stream(),
         p, g, v, lr, mu, param->numel(), lars_coeff, lars_weight_decay,
         p_norm_data, g_norm_data, p_out, v_out);
   }

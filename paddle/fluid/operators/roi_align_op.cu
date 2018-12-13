@@ -273,8 +273,8 @@ class GPUROIAlignOpKernel : public framework::OpKernel<T> {
     Tensor roi_batch_id_list_gpu;
     framework::TensorCopySync(roi_batch_id_list, ctx.GetPlace(),
                               &roi_batch_id_list_gpu);
-    GPUROIAlignForward<
-        T><<<blocks, threads, 0, ctx.cuda_device_context().stream()>>>(
+    hipLaunchKernelGGL((GPUROIAlignForward<
+        T>), dim3(blocks), dim3(threads), 0, ctx.cuda_device_context().stream(),
         output_size, in->data<T>(), rois->data<T>(), spatial_scale, channels,
         height, width, pooled_height, pooled_width, sampling_ratio,
         roi_batch_id_list_gpu.data<int>(),
@@ -329,8 +329,8 @@ class GPUROIAlignGradOpKernel : public framework::OpKernel<T> {
     int threads = kNumCUDAThreads;
 
     if (output_grad_size > 0) {
-      GPUROIAlignBackward<
-          T><<<blocks, threads, 0, ctx.cuda_device_context().stream()>>>(
+      hipLaunchKernelGGL((GPUROIAlignBackward<
+          T>), dim3(blocks), dim3(threads), 0, ctx.cuda_device_context().stream(),
           output_grad_size, rois->data<T>(), out_grad->data<T>(), rois_num,
           spatial_scale, channels, height, width, pooled_height, pooled_width,
           sampling_ratio, roi_batch_id_list_gpu.data<int>(),

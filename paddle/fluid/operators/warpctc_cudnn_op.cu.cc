@@ -12,10 +12,17 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
+#ifdef PADDLE_WITH_CUDA
+
 #include "paddle/fluid/framework/mixed_vector.h"
 #include "paddle/fluid/operators/math/softmax.h"
 #include "paddle/fluid/operators/warpctc_op.h"
+#ifdef PADDLE_WITH_CUDA
 #include "paddle/fluid/platform/cudnn_helper.h"
+#endif
+#ifdef PADDLE_WITH_HIP
+#include "paddle/fluid/platform/miopen_helper.h"
+#endif
 
 namespace paddle {
 namespace operators {
@@ -195,4 +202,6 @@ REGISTER_OP_KERNEL(
 REGISTER_OP_KERNEL(
     warpctc_grad, CUDNN, plat::CUDAPlace,
     ops::CudnnCTCGradKernel<paddle::platform::CUDADeviceContext, float>);
+#endif
+
 #endif

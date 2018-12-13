@@ -361,7 +361,7 @@ class CUDAROIPerspectiveTransformOpKernel : public framework::OpKernel<T> {
     int block = 512;
     int grid = (out_size + block - 1) / block;
 
-    RoiTransformKernel<T><<<grid, block, 0, stream>>>(
+    hipLaunchKernelGGL((RoiTransformKernel<T>), dim3(grid), dim3(block), 0, stream,
         input_data, rois_data, roi2image_dev.data<int>(), rois_num, in_height,
         in_width, channels, transformed_height, transformed_width,
         spatial_scale, output_data);
@@ -510,7 +510,7 @@ class CUDAROIPerspectiveTransformGradOpKernel : public framework::OpKernel<T> {
     int block = 512;
     int grid = (in_size + block - 1) / block;
 
-    RoiTransformGradKernel<T><<<grid, block, 0, stream>>>(
+    hipLaunchKernelGGL((RoiTransformGradKernel<T>), dim3(grid), dim3(block), 0, stream,
         lod_data, rois_data, batch_size, rois_num, in_height, in_width,
         channels, transformed_height, transformed_width, spatial_scale,
         out_grad_data, in_grad_data);

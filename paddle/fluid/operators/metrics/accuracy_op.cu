@@ -12,6 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
+#include "hip/hip_runtime.h"
 #include <thrust/execution_policy.h>
 #include <thrust/reduce.h>
 #include "paddle/fluid/operators/metrics/accuracy_op.h"
@@ -83,9 +84,9 @@ class AccuracyOpCUDAKernel : public framework::OpKernel<T> {
       return;
     }
 
-    AccuracyCudaKernel<
-        PADDLE_CUDA_NUM_THREADS><<<1, PADDLE_CUDA_NUM_THREADS, 0, stream>>>(
-        num_samples, infer_width, indices_data, label_data, correct_data,
+    hipLaunchKernelGGL((AccuracyCudaKernel<
+        PADDLE_CUDA_NUM_THREADS>), dim3(1), dim3(PADDLE_CUDA_NUM_THREADS), 0, stream,
+        num_samples, int(infer_width), indices_data, label_data, correct_data,
         accuracy_data, total_data);
   }
 };

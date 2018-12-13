@@ -11,7 +11,7 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
-
+#include "hip/hip_runtime.h"
 #include "paddle/fluid/operators/math/math_function.h"
 #include "paddle/fluid/operators/mean_iou_op.h"
 #include "paddle/fluid/platform/cuda_primitives.h"
@@ -145,11 +145,10 @@ class MeanIoUCUDAOpKernel : public framework::OpKernel<T> {
     int block = PADDLE_CUDA_NUM_THREADS;
     int grid = (predictions->numel() + block - 1) / block;
     int cache_size = (num_classes * 2 + 1) * sizeof(int);
-    CountCUDAKernel<T><<<grid, block, cache_size, stream>>>(
-        num_classes, predictions->numel(), predictions_data, labels_data,
+    hipLaunchKernelGGL((CountCUDAKernel<T>), dim3(grid), dim3(block), cache_size, stream,
+        num_classes, int(predictions->numel()), predictions_data, labels_data,
         out_wrong_data, out_correct_data);
-
-    ComputeIoUCUDAKernel<<<1, block, 0, stream>>>(num_classes, out_wrong_data,
+    hipLaunchKernelGGL((ComputeIoUCUDAKernel), dim3(1), dim3(block), 0, stream, num_classes, out_wrong_data,
                                                   out_correct_data, ious_data,
                                                   out_mean_iou_data);
   }
