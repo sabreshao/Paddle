@@ -23,6 +23,8 @@ limitations under the License. */
 
 #ifdef PADDLE_WITH_HIP
 #include <hip/hip_runtime.h>
+#define PADDLE_CUDA_FP16
+#include <hip/hip_fp16.h>
 #endif  // PADDLE_WITH_HIP
 
 #ifdef __GNUC__
@@ -91,19 +93,26 @@ struct PADDLE_ALIGN(2) float16 {
 
   // The following defaulted special class member functions
   // are added to make float16 pass the std::is_trivial test
+#ifdef PADDLE_WITH_HIP
+  HOSTDEVICE float16() = default;
+  HOSTDEVICE float16(const float16& o) = default;
+  HOSTDEVICE float16& operator=(const float16& o) = default;
+  HOSTDEVICE float16(float16&& o) = default;
+  HOSTDEVICE float16& operator=(float16&& o) = default;
+  HOSTDEVICE ~float16() = default;
+#else
   float16() = default;
   float16(const float16& o) = default;
   float16& operator=(const float16& o) = default;
   float16(float16&& o) = default;
   float16& operator=(float16&& o) = default;
-#ifndef PADDLE_WITH_HIP
   ~float16() = default;
 #endif
 
 // Constructors
 #ifdef PADDLE_CUDA_FP16
   HOSTDEVICE inline explicit float16(const half& h) {
-#if CUDA_VERSION >= 9000
+#if CUDA_VERSION >= 9000 || defined(PADDLE_WITH_HIP)
     x = reinterpret_cast<__half_raw*>(const_cast<half*>(&h))->x;
 #else
     x = h.x;
@@ -164,7 +173,7 @@ struct PADDLE_ALIGN(2) float16 {
 // Assignment operators
 #ifdef PADDLE_CUDA_FP16
   HOSTDEVICE inline float16& operator=(const half& rhs) {
-#if CUDA_VERSION >= 9000
+#if CUDA_VERSION >= 9000 || defined(PADDLE_WITH_HIP)
     x = reinterpret_cast<__half_raw*>(const_cast<half*>(&rhs))->x;
 #else
     x = rhs.x;
@@ -243,7 +252,7 @@ struct PADDLE_ALIGN(2) float16 {
 // Conversion opertors
 #ifdef PADDLE_CUDA_FP16
   HOSTDEVICE inline explicit operator half() const {
-#if CUDA_VERSION >= 9000
+#if CUDA_VERSION >= 9000 || defined(PADDLE_WITH_HIP)
     __half_raw h;
     h.x = x;
     return half(h);
@@ -375,7 +384,7 @@ struct PADDLE_ALIGN(2) float16 {
 // CUDA 7.5 and 8.0 do not. The arithmetic operators defined here are
 // for users to write similar CUDA code in CUDA 7.5 and 8.0 as in
 // CUDA 9.0 regarding the half data type.
-#if defined(PADDLE_CUDA_FP16) && CUDA_VERSION < 9000
+#if defined(PADDLE_CUDA_FP16) && CUDA_VERSION < 9000 && !defined(PADDLE_WITH_HIP)
 
 DEVICE inline half operator+(const half& a, const half& b) {
 #if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 530
@@ -908,12 +917,14 @@ struct is_pod<paddle::platform::float16> {
       is_standard_layout<paddle::platform::float16>::value;
 };
 
+#if !defined(PADDLE_WITH_HIP)
 template <>
 struct is_floating_point<paddle::platform::float16>
     : std::integral_constant<
           bool, std::is_same<paddle::platform::float16,
                              typename std::remove_cv<
                                  paddle::platform::float16>::type>::value> {};
+#endif
 template <>
 struct is_signed<paddle::platform::float16> {
   static const bool value = true;
@@ -958,13 +969,13 @@ struct numeric_limits<paddle::platform::float16> {
   static const bool traps = true;
   static const bool tinyness_before = false;
 
-  static paddle::platform::float16(min)() {
+  static paddle::platform::float16 min() {
     return paddle::platform::raw_uint16_to_float16(0x400);
   }
   static paddle::platform::float16 lowest() {
     return paddle::platform::raw_uint16_to_float16(0xfbff);
   }
-  static paddle::platform::float16(max)() {
+  static paddle::platform::float16 max() {
     return paddle::platform::raw_uint16_to_float16(0x7bff);
   }
   static paddle::platform::float16 epsilon() {

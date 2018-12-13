@@ -24,15 +24,24 @@ DEFINE_double(fraction_of_gpu_memory_to_use, 0.92,
               "Default use 92% of GPU memory for PaddlePaddle,"
               "reserve the rest for page tables, etc");
 
+DEFINE_bool(
+    enable_cublas_tensor_op_math, false,
+    "The enable_cublas_tensor_op_math indicate whether to use Tensor Core, "
+    "but it may loss precision. Currently, There are two CUDA libraries that"
+    " use Tensor Cores, cuBLAS and cuDNN. cuBLAS uses Tensor Cores to speed up"
+    " GEMM computations(the matrices must be either half precision or single "
+    "precision); cuDNN uses Tensor Cores to speed up both convolutions(the "
+    "input and output must be half precision) and recurrent neural networks "
+    "(RNNs).");
 
 DEFINE_string(selected_gpus, "",
-	      "A list of device ids separated by comma, like: 0,1,2,3. "
-	      "This option is useful when doing multi process training and "
-	      "each process have only one device (GPU). If you want to use "
-	      "all visible devices, set this to empty string. NOTE: the "
-	      "reason of doing this is that we want to use P2P communication"
-	      "between GPU devices, use CUDA_VISIBLE_DEVICES can only use"
-	      "share-memory only.");
+              "A list of device ids separated by comma, like: 0,1,2,3. "
+              "This option is useful when doing multi process training and "
+              "each process have only one device (GPU). If you want to use "
+              "all visible devices, set this to empty string. NOTE: the "
+              "reason of doing this is that we want to use P2P communication"
+              "between GPU devices, use CUDA_VISIBLE_DEVICES can only use"
+              "share-memory only.");
 
 namespace paddle {
 namespace platform {

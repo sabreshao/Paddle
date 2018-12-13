@@ -123,7 +123,8 @@ extern void EnforceMIOPENLoaded(const char* fn_name);
   __macro(miopenCreateActivationDescriptor);                \
   __macro(miopenSetActivationDescriptor);                   \
   __macro(miopenGetActivationDescriptor);                   \
-  __macro(miopenDestroyActivationDescriptor);
+  __macro(miopenDestroyActivationDescriptor);               \
+  __macro(miopenSetConvolutionGroupCount);
 MIOPEN_DNN_ROUTINE_EACH(DECLARE_DYNAMIC_LOAD_MIOPEN_WRAP)
 
 
