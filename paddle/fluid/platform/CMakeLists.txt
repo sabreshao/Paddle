@@ -97,7 +97,7 @@ cc_test(profiler_test SRCS profiler_test.cc DEPS profiler)
 if(WITH_GPU)
   nv_test(float16_gpu_test SRCS float16_test.cu DEPS lod_tensor)
 elseif(WITH_AMD_GPU)
-  hip_test(float16_gpu_test SRCS float16_test.cu DEPS lod_tensor)
+  #hip_test(float16_gpu_test SRCS float16_test.cu DEPS lod_tensor)
 endif()
 cc_test(float16_test SRCS float16_test.cc DEPS lod_tensor)
 

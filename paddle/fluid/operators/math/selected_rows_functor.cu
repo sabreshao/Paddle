@@ -137,9 +137,9 @@ struct SelectedRowsAddTensor<platform::CUDADeviceContext, T> {
 
 template struct SelectedRowsAddTensor<platform::CUDADeviceContext, float>;
 template struct SelectedRowsAddTensor<platform::CUDADeviceContext, double>;
-template struct SelectedRowsAdd<platform::CUDADeviceContext, platform::float16>;
-template struct SelectedRowsAddTensor<platform::CUDADeviceContext,
-                                      platform::float16>;
+//template struct SelectedRowsAdd<platform::CUDADeviceContext, platform::float16>;
+//template struct SelectedRowsAddTensor<platform::CUDADeviceContext,
+//                                      platform::float16>;
 
 template <typename T>
 struct SelectedRowsAddTo<platform::CUDADeviceContext, T> {

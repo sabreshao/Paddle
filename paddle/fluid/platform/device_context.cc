@@ -425,7 +425,31 @@ class EigenHipStreamDevice : public Eigen::StreamInterface {
   mutable std::unordered_map<void*, memory::AllocationPtr> allocations_;
 };
 
-CUDADeviceContext::CUDADeviceContext(CUDAPlace place) : place_(place) {
+MiopenHolder::MiopenHolder(const hipStream_t* stream, const CUDAPlace& place)
+    : workspace_(nullptr), stream_(stream), place_(place) {
+  PADDLE_ENFORCE(dynload::miopenCreate(&miopen_handle_));
+  PADDLE_ENFORCE(dynload::miopenSetStream(miopen_handle_, *stream_));
+}
+
+MiopenHolder::~MiopenHolder() {
+  PADDLE_ENFORCE(dynload::miopenDestroy(miopen_handle_));
+}
+
+void MiopenHolder::ReallocateWorkspace(size_t required_workspace_len) {
+  if (required_workspace_len <= WorkspaceSize()) {
+    return;
+  }
+  if (workspace_ != nullptr) {
+    // Maybe someone is using the current workspace
+    PADDLE_ENFORCE(hipStreamSynchronize(*stream_));
+    workspace_.reset();
+  }
+  workspace_ = paddle::memory::Alloc(place_, required_workspace_len,
+                                     paddle::memory::Allocator::kScratchpad);
+}
+
+CUDADeviceContext::CUDADeviceContext(CUDAPlace place)
+            : place_(place), miopen_holder_(nullptr) {
   SetDeviceId(place_.device);
   compute_capability = GetCUDAComputeCapability(place_.device);
   multi_process = GetCUDAMultiProcessors(place_.device);
@@ -437,10 +461,7 @@ CUDADeviceContext::CUDADeviceContext(CUDAPlace place) : place_(place) {
   PADDLE_ENFORCE(dynload::hipblasCreate(&hipblas_handle_));
   PADDLE_ENFORCE(dynload::hipblasSetStream(hipblas_handle_, stream_));
   if (dynload::HasMIOpen()) {
-    PADDLE_ENFORCE(dynload::miopenCreate(&miopen_handle_));
-    PADDLE_ENFORCE(dynload::miopenSetStream(miopen_handle_, stream_));
-  } else {
-    miopen_handle_ = nullptr;
+    miopen_holder_.reset(new MiopenHolder(&stream_, place));
   }
 }
 
@@ -448,9 +469,7 @@ CUDADeviceContext::~CUDADeviceContext() {
   SetDeviceId(place_.device);
   Wait();
   PADDLE_ENFORCE(dynload::hipblasDestroy(hipblas_handle_));
-  if (miopen_handle_ != nullptr) {
-    PADDLE_ENFORCE(dynload::miopenDestroy(miopen_handle_));
-  }
+
   eigen_stream_.reset();
   eigen_device_.reset();
   PADDLE_ENFORCE(hipStreamDestroy(stream_));
@@ -480,7 +499,13 @@ hipblasHandle_t CUDADeviceContext::hipblas_handle() const {
   return hipblas_handle_;
 }
 
-miopenHandle_t CUDADeviceContext::miopen_handle() const { return miopen_handle_; }
+miopenHandle_t CUDADeviceContext::miopen_handle() const {
+  return miopen_holder_->miopen_handle();
+}
+
+MiopenWorkspaceHandle CUDADeviceContext::miopen_workspace_handle() const {
+  return MiopenWorkspaceHandle(miopen_holder_.get());
+}
 
 hipStream_t CUDADeviceContext::stream() const { return stream_; }
 

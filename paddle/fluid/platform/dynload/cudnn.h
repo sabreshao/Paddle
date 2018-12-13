@@ -15,12 +15,7 @@ limitations under the License. */
 #pragma once
 #include <glog/logging.h>
 
-#ifdef PADDLE_WITH_HIP
-#include <miopen/miopen.h>
-#include <dlfcn.h>
-#else
 #include <cudnn.h>
-#endif
 #include <mutex>  // NOLINT
 #include "paddle/fluid/platform/dynload/dynamic_loader.h"
 #include "paddle/fluid/platform/port.h"
@@ -32,30 +27,6 @@ namespace dynload {
 extern std::once_flag cudnn_dso_flag;
 extern void* cudnn_dso_handle;
 extern bool HasCUDNN();
-
-#ifdef PADDLE_WITH_HIP
-inline const char* miopenGetErrorString(miopenStatus_t status) {
-  switch (status) {
-    case miopenStatusSuccess:
-      return "MIOPEN_STATUS_SUCCESS";
-    case miopenStatusNotInitialized:
-      return "MIOPEN_STATUS_NOT_INITIALIZED";
-    case miopenStatusInvalidValue:
-      return "MIOPEN_STATUS_INVALID_VALUE";
-    case miopenStatusBadParm:
-      return "MIOPEN_STATUS_BAD_PARAM";
-    case miopenStatusAllocFailed:
-      return "MIOPEN_STATUS_ALLOC_FAILED";
-    case miopenStatusInternalError:
-      return "MIOPEN_STATUS_INTERNAL_ERROR";
-    case miopenStatusNotImplemented:
-      return "MIOPEN_STATUS_NOT_IMPLEMENTED";
-    case miopenStatusUnknownError:
-    default:
-      return "MIOPEN_STATUS_UNKNOWN_ERROR";
-  }
-}
-#endif
 
 #ifdef PADDLE_USE_DSO
 
@@ -92,36 +63,6 @@ extern void EnforceCUDNNLoaded(const char* fn_name);
  * include all needed cudnn functions in HPPL
  * different cudnn version has different interfaces
  **/
-#ifdef PADDLE_WITH_HIP
-#define CUDNN_DNN_ROUTINE_EACH(__macro)             \
-  __macro(miopenSet4dTensorDescriptor);              \
-  __macro(miopenGet4dTensorDescriptor);              \
-  __macro(miopenFindConvolutionForwardAlgorithm);     \
-  __macro(miopenGetConvolutionDescriptor);           \
-  __macro(miopenCreateTensorDescriptor);             \
-  __macro(miopenDestroyTensorDescriptor);            \
-  __macro(miopenSet2dPoolingDescriptor);             \
-  __macro(miopenGet2dPoolingDescriptor);             \
-  __macro(miopenCreateConvolutionDescriptor);        \
-  __macro(miopenCreatePoolingDescriptor);            \
-  __macro(miopenDestroyPoolingDescriptor);           \
-  __macro(miopenInitConvolutionDescriptor);         \
-  __macro(miopenDestroyConvolutionDescriptor);       \
-  __macro(miopenDeriveBNTensorDescriptor);           \
-  __macro(miopenCreate);                             \
-  __macro(miopenDestroy);                            \
-  __macro(miopenSetStream);                          \
-  __macro(miopenActivationForward);                  \
-  __macro(miopenConvolutionForward);                 \
-  __macro(miopenConvolutionBackwardBias);            \
-  __macro(miopenConvolutionForwardGetWorkSpaceSize); \
-  __macro(miopenPoolingGetWorkSpaceSize);            \
-  __macro(miopenPoolingForward);                     \
-  __macro(miopenPoolingBackward);                    \
-  __macro(miopenSoftmaxBackward);                    \
-  __macro(miopenSoftmaxForward);
-CUDNN_DNN_ROUTINE_EACH(DECLARE_DYNAMIC_LOAD_CUDNN_WRAP)
-#else
 #define CUDNN_DNN_ROUTINE_EACH(__macro)                   \
   __macro(cudnnSetTensor4dDescriptor);                    \
   __macro(cudnnSetTensor4dDescriptorEx);                  \
@@ -187,32 +128,14 @@ CUDNN_DNN_ROUTINE_EACH(DECLARE_DYNAMIC_LOAD_CUDNN_WRAP)
   __macro(cudnnDestroyRNNDescriptor);
 
 CUDNN_DNN_ROUTINE_EACH(DECLARE_DYNAMIC_LOAD_CUDNN_WRAP)
-#endif
 
-#ifdef PADDLE_WITH_HIP
-#define CUDNN_DNN_ROUTINE_EACH_R2(__macro) \
-  __macro(miopenAddTensor);                 \
-  __macro(miopenConvolutionBackwardData);   \
-  __macro(miopenConvolutionBackwardWeights);
-CUDNN_DNN_ROUTINE_EACH_R2(DECLARE_DYNAMIC_LOAD_CUDNN_WRAP)
-#else
 #define CUDNN_DNN_ROUTINE_EACH_R2(__macro) \
   __macro(cudnnAddTensor);                 \
   __macro(cudnnConvolutionBackwardData);   \
   __macro(cudnnConvolutionBackwardFilter);
 CUDNN_DNN_ROUTINE_EACH_R2(DECLARE_DYNAMIC_LOAD_CUDNN_WRAP)
-#endif
 
 // APIs available after R3:
-#ifdef PADDLE_WITH_HIP
-#define CUDNN_DNN_ROUTINE_EACH_AFTER_R3(__macro)           \
-  __macro(miopenConvolutionBackwardWeightsGetWorkspaceSize); \
-  __macro(miopenFindConvolutionBackwardDataAlgorithm);       \
-  __macro(miopenFindConvolutionBackwardWeightsAlgorithm);     \
-  __macro(miopenConvolutionBackwardWeightsGetWorkSpaceSize);    \
-  __macro(miopenConvolutionBackwardDataGetWorkSpaceSize);
-CUDNN_DNN_ROUTINE_EACH_AFTER_R3(DECLARE_DYNAMIC_LOAD_CUDNN_WRAP)
-#else
 #if CUDNN_VERSION >= 3000
 #define CUDNN_DNN_ROUTINE_EACH_AFTER_R3(__macro)           \
   __macro(cudnnGetConvolutionBackwardFilterWorkspaceSize); \
@@ -221,16 +144,8 @@ CUDNN_DNN_ROUTINE_EACH_AFTER_R3(DECLARE_DYNAMIC_LOAD_CUDNN_WRAP)
   __macro(cudnnGetConvolutionBackwardDataWorkspaceSize);
 CUDNN_DNN_ROUTINE_EACH_AFTER_R3(DECLARE_DYNAMIC_LOAD_CUDNN_WRAP)
 #endif
-#endif
 
 // APIs available after R4:
-#ifdef PADDLE_WITH_HIP
-#define CUDNN_DNN_ROUTINE_EACH_AFTER_R4(__macro)    \
-  __macro(miopenBatchNormalizationForwardTraining);  \
-  __macro(miopenBatchNormalizationForwardInference); \
-  __macro(miopenBatchNormalizationBackward);
-CUDNN_DNN_ROUTINE_EACH_AFTER_R4(DECLARE_DYNAMIC_LOAD_CUDNN_WRAP)
-#else
 #if CUDNN_VERSION >= 4007
 #define CUDNN_DNN_ROUTINE_EACH_AFTER_R4(__macro)    \
   __macro(cudnnBatchNormalizationForwardTraining);  \
@@ -238,17 +153,8 @@ CUDNN_DNN_ROUTINE_EACH_AFTER_R4(DECLARE_DYNAMIC_LOAD_CUDNN_WRAP)
   __macro(cudnnBatchNormalizationBackward);
 CUDNN_DNN_ROUTINE_EACH_AFTER_R4(DECLARE_DYNAMIC_LOAD_CUDNN_WRAP)
 #endif
-#endif
 
 // APIs in R5
-#ifdef PADDLE_WITH_HIP
-#define CUDNN_DNN_ROUTINE_EACH_R5(__macro)  \
-  __macro(miopenCreateActivationDescriptor); \
-  __macro(miopenSetActivationDescriptor);    \
-  __macro(miopenGetActivationDescriptor);    \
-  __macro(miopenDestroyActivationDescriptor);
-CUDNN_DNN_ROUTINE_EACH_R5(DECLARE_DYNAMIC_LOAD_CUDNN_WRAP)
-#else
 #if CUDNN_VERSION >= 5000
 #define CUDNN_DNN_ROUTINE_EACH_R5(__macro)  \
   __macro(cudnnCreateActivationDescriptor); \
@@ -277,7 +183,7 @@ CUDNN_DNN_ROUTINE_EACH_R6(DECLARE_DYNAMIC_LOAD_CUDNN_WRAP)
   __macro(cudnnCTCLoss);
 CUDNN_DNN_ROUTINE_EACH_R7(DECLARE_DYNAMIC_LOAD_CUDNN_WRAP)
 #endif
-#endif
+
 }  // namespace dynload
 }  // namespace platform
 }  // namespace paddle

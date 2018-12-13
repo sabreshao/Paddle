@@ -365,6 +365,75 @@ struct DefaultDeviceContextType<platform::CUDAPinnedPlace> {
 #ifdef PADDLE_WITH_HIP
 
 class EigenHipStreamDevice;
+class MiopenHolder {
+ public:
+  MiopenHolder(const hipStream_t* stream, const CUDAPlace& place);
+  ~MiopenHolder();
+  miopenHandle_t miopen_handle() const { return miopen_handle_; }
+
+ private:
+  friend class MiopenWorkspaceHandle;
+  void ReallocateWorkspace(size_t required_workspace_len);
+
+  template <typename Callback>
+  void RunFuncImpl(Callback&& miopen_func, size_t required_workspace_len) {
+    if (required_workspace_len > WorkspaceSize()) {
+      ReallocateWorkspace(required_workspace_len);
+    }
+    miopen_func(WorkspacePtr());
+  }
+
+  inline void* WorkspacePtr() {
+    if (workspace_) {
+      return workspace_->ptr();
+    } else {
+      return nullptr;
+    }
+  }
+
+  inline size_t WorkspaceSize() {
+    if (workspace_) {
+      return workspace_->size();
+    } else {
+      return 0;
+    }
+  }
+
+  std::mutex& Mutex() { return mtx_; }
+
+  miopenHandle_t miopen_handle_;
+  memory::AllocationPtr workspace_;
+
+  const hipStream_t* stream_;  // not owned;
+  const CUDAPlace place_;
+
+  std::mutex mtx_;
+};
+
+class MiopenWorkspaceHandle {
+ public:
+  /*! \brief The lock would not be acquired when constructor calls.
+   *  The lock would be acquired when RunFunc() is called first time. */
+  inline explicit MiopenWorkspaceHandle(MiopenHolder* holder) : holder_(holder) {}
+
+  /*! \brief Thread which call RunFunc() would acquire the lock first
+   *  before invoking cudnn functions. */
+  template <typename Callback>
+  inline void RunFunc(Callback&& miopen_func, size_t required_workspace_len) {
+    if (!guard_) {
+      guard_.reset(new std::lock_guard<std::mutex>(holder_->Mutex()));
+    }
+    holder_->RunFuncImpl(std::forward<Callback>(miopen_func),
+                         required_workspace_len);
+  }
+
+  MiopenWorkspaceHandle(MiopenWorkspaceHandle&&) = default;
+  MiopenWorkspaceHandle& operator=(MiopenWorkspaceHandle&&) = delete;
+
+ private:
+  MiopenHolder* holder_;  // not own
+  std::unique_ptr<std::lock_guard<std::mutex>> guard_;
+};
 
 class CUDADeviceContext : public DeviceContext {
  public:
@@ -392,6 +461,8 @@ class CUDADeviceContext : public DeviceContext {
   /*! \brief  Return miopen handle in the device context. */
   miopenHandle_t miopen_handle() const;
 
+  MiopenWorkspaceHandle miopen_workspace_handle() const;
+
   /*! \brief  Return cuda stream in the device context. */
   hipStream_t stream() const;
 
@@ -418,6 +489,7 @@ class CUDADeviceContext : public DeviceContext {
 
   std::unique_ptr<Eigen::GpuDevice> eigen_device_;
   std::unique_ptr<EigenHipStreamDevice> eigen_stream_;
+  std::unique_ptr<MiopenHolder> miopen_holder_;
 
   mutable std::recursive_mutex mutex_;
   hipStream_t stream_;

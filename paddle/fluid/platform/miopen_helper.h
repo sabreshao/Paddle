@@ -24,6 +24,8 @@ limitations under the License. */
 #include "paddle/fluid/platform/float16.h"
 #include "paddle/fluid/platform/macros.h"
 
+DECLARE_bool(miopen_deterministic);
+
 namespace paddle {
 namespace platform {
 
@@ -47,6 +49,43 @@ enum class PoolingMode {
   kMaximum,
   kAverage,
 };
+
+inline miopenPoolingMode_t GetPoolingMode(const PoolingMode& mode) {
+  switch (mode) {
+    case PoolingMode::kMaximumDeterministic:
+      return miopenPoolingMax;
+    case PoolingMode::kMaximum:
+      return miopenPoolingMax;
+    case PoolingMode::kAverageExclusive:
+      LOG(WARNING)<<"MIOpen currently implementation only support inclusive avg pooling, "
+                  <<"using exclusive may result in calculation fail";
+      return miopenPoolingAverage;
+    case PoolingMode::kAverageInclusive:
+      return miopenPoolingAverage;
+    default:
+      PADDLE_THROW("Unexpected pooling mode.");
+  }
+}
+
+inline ActivationMode StringToActivationMode(const std::string& str) {
+  if (str == "identity") {
+    return ActivationMode::kNone;
+  } else if (str == "sigmoid") {
+    return ActivationMode::kSigmoid;
+  } else if (str == "relu") {
+    return ActivationMode::kRelu;
+  } else if (str == "relu6") {
+    return ActivationMode::kRelu6;
+  } else if (str == "relux") {
+    return ActivationMode::kReluX;
+  } else if (str == "tanh") {
+    return ActivationMode::kTanh;
+  } else if (str == "bandpass") {
+    return ActivationMode::kBandPass;
+  } else {
+    PADDLE_THROW("Unknown activation string: %s", str);
+  }
+}
 
 template <typename T>
 class MIOpenDataType;
@@ -225,9 +264,7 @@ class ScopedPoolingDescriptor {
     }
 
     PADDLE_ENFORCE(dynload::miopenSet2dPoolingDescriptor(
-        desc_, (mode == PoolingMode::kMaximum
-                    ? miopenPoolingMax
-                    : miopenPoolingAverage),
+        desc_, (GetPoolingMode(mode)),
         kernel[0], kernel[1], pads[0], pads[1], strides[0], strides[1]));
     return desc_;
   }

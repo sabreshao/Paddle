@@ -21,6 +21,8 @@
 #include "paddle/fluid/framework/scope.h"
 #if defined(PADDLE_WITH_CUDA) && !defined(_WIN32)
 #include "paddle/fluid/platform/nccl_helper.h"
+#elif defined(PADDLE_WITH_HIP)
+#include "paddle/fluid/platform/rccl_helper.h"
 #endif
 #if defined(PADDLE_WITH_HIP)
 #include "paddle/fluid/platform/rccl_helper.h"

@@ -83,9 +83,19 @@ class PoolCUDNNOpKernel : public framework::OpKernel<T> {
     // ------------------- cudnn pool algorithm ---------------------
     auto handle = ctx.cuda_device_context().cudnn_handle();
     ScalingParamType<T> alpha = 1.0f, beta = 0.0f;
-    CUDNN_ENFORCE(platform::dynload::cudnnPoolingForward(
+    size_t workspace_size_in_bytes;  // final workspace to allocate.
+
+    PADDLE_ENFORCE(platform::dynload::miopenPoolingGetWorkSpaceSize(
+        cudnn_output_desc, &workspace_size_in_bytes));
+
+    auto& dev_ctx = ctx.template device_context<platform::CUDADeviceContext>();
+    auto workspace_handle = dev_ctx.miopen_workspace_handle();
+    auto miopen_func = [&](void* miopen_workspace){
+      PADDLE_ENFORCE(platform::dynload::miopenPoolingForward(
         handle, cudnn_pool_desc, &alpha, cudnn_input_desc, input_data, &beta,
-        cudnn_output_desc, output_data));
+        cudnn_output_desc, output_data, false, miopen_workspace, workspace_size_in_bytes));
+    };
+    workspace_handle.RunFunc(miopen_func, workspace_size_in_bytes);
   }
 };
 
@@ -156,12 +166,20 @@ class PoolCUDNNGradOpKernel : public framework::OpKernel<T> {
     ScalingParamType<T> alpha = 1.0f, beta = 0.0f;
     if (input_grad) {
       T *input_grad_data = input_grad->mutable_data<T>(ctx.GetPlace());
-      // Because beta is zero, it is unnecessary to reset input_grad.
 
-      CUDNN_ENFORCE(platform::dynload::cudnnPoolingBackward(
+      size_t workspace_size_in_bytes;  // final workspace to allocate.
+      PADDLE_ENFORCE(platform::dynload::miopenPoolingGetWorkSpaceSize(
+          cudnn_output_desc, &workspace_size_in_bytes));
+      // Because beta is zero, it is unnecessary to reset input_grad.
+      auto& dev_ctx = ctx.template device_context<platform::CUDADeviceContext>();
+      auto workspace_handle = dev_ctx.miopen_workspace_handle();
+      auto miopen_func = [&](void* miopen_workspace){
+        PADDLE_ENFORCE(platform::dynload::miopenPoolingBackward(
           handle, cudnn_pool_desc, &alpha, cudnn_output_desc, output_data,
           cudnn_output_desc, output_grad_data, cudnn_input_desc, input_data,
-          &beta, cudnn_input_desc, input_grad_data));
+          &beta, cudnn_input_desc, input_grad_data, miopen_workspace));
+      };
+      workspace_handle.RunFunc(miopen_func, workspace_size_in_bytes);
     }
   }
 };
