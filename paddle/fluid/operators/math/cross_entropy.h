@@ -42,7 +42,7 @@ struct TolerableValue {
 // if the scale value will be adjusted.
 // Also. In standard implementation of cross entropy, other
 // framework not has the ValueClipping.
-#ifndef PADDLE_WITH_HIP
+#ifdef PADDLE_WITH_CUDA
 template <>
 struct TolerableValue<platform::float16> {
   HOSTDEVICE platform::float16 operator()(const platform::float16& x) const {

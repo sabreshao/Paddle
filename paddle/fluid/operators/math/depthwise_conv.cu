@@ -35,6 +35,16 @@ __inline__ __device__ T warpReduceSum(T val) {
   return val;
 #endif
 }
+#ifdef PADDLE_WITH_HIP
+// Fix ME.
+__forceinline__ __device__ unsigned lane_id() {
+  return 0;
+}
+
+__forceinline__ __device__ unsigned warp_id() {
+  return 0;
+}
+#else
 __forceinline__ __device__ unsigned lane_id() {
   unsigned ret;
   asm volatile("mov.u32 %0, %laneid;" : "=r"(ret));
@@ -46,6 +56,7 @@ __forceinline__ __device__ unsigned warp_id() {
   asm volatile("mov.u32 %0, %warpid;" : "=r"(ret));
   return ret;
 }
+#endif
 
 #define ARG_DEFINE_KernelDepthwiseConv                                         \
   const T *const input_data, const T *const filter_data, const int batch_size, \
@@ -348,7 +359,7 @@ __device__ __inline__ void KernelDepthwiseConvFilterGrad(
   T s = 0;
 
   int gbid = ((blockIdx.z * gridDim.y) + blockIdx.y) * gridDim.x + blockIdx.x;
-  int lid = lane_id();
+  int lid = 0;//lane_id();
 
   for (int image_w = threadIdx.x; image_w < output_width;
        image_w += blockDim.x) {
