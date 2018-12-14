@@ -24,6 +24,8 @@ limitations under the License. */
 #include "paddle/fluid/platform/float16.h"
 #include "paddle/fluid/platform/macros.h"
 
+DECLARE_bool(miopen_deterministic);
+
 namespace paddle {
 namespace platform {
 
@@ -58,6 +60,23 @@ enum ActivationMode {
   kTanh,
   kBandPass,
 };
+
+inline miopenPoolingMode_t GetPoolingMode(const PoolingMode& mode) {
+  switch (mode) {
+    case PoolingMode::kMaximumDeterministic:
+      return miopenPoolingMax;
+    case PoolingMode::kMaximum:
+      return miopenPoolingMax;
+    case PoolingMode::kAverageExclusive:
+      LOG(WARNING)<<"MIOpen currently implementation only support inclusive avg pooling, "
+                  <<"using exclusive may result in calculation fail";
+      return miopenPoolingAverage;
+    case PoolingMode::kAverageInclusive:
+      return miopenPoolingAverage;
+    default:
+      PADDLE_THROW("Unexpected pooling mode.");
+  }
+}
 
 inline ActivationMode StringToActivationMode(const std::string& str) {
   if (str == "identity") {
@@ -256,9 +275,7 @@ class ScopedPoolingDescriptor {
     }
 
     PADDLE_ENFORCE(dynload::miopenSet2dPoolingDescriptor(
-        desc_, (mode == PoolingMode::kMaximum
-                    ? miopenPoolingMax
-                    : miopenPoolingAverage),
+        desc_, (GetPoolingMode(mode)),
         kernel[0], kernel[1], pads[0], pads[1], strides[0], strides[1]));
     return desc_;
   }
