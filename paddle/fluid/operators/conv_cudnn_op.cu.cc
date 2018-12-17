@@ -619,17 +619,17 @@ class CUDNNConvGradOpKernel : public framework::OpKernel<T> {
     int algoCount = 0;
     if (input_grad) {
         T* input_grad_data = input_grad->mutable_data<T>(ctx.GetPlace());
+        auto miopen_find_bd_data_func = [&](void* miopen_workspace) {
+            PADDLE_ENFORCE(platform::dynload::miopenFindConvolutionBackwardDataAlgorithm(
+                handle,
+                cudnn_output_grad_desc, output_grad_data,
+                cudnn_filter_desc, filter_data,
+                cudnn_conv_desc,
+                cudnn_input_desc, input_grad_data,
+                1, &algoCount, &perfRes, miopen_workspace, workspace_size_in_bytes, false));
+        };
+        workspace_handle.RunFunc(miopen_find_bd_data_func,workspace_size_in_bytes);
         for (int i = 0; i < groups; i++) {
-            auto miopen_find_bd_data_func = [&](void* miopen_workspace) {
-                PADDLE_ENFORCE(platform::dynload::miopenFindConvolutionBackwardDataAlgorithm(
-                    handle,
-                    cudnn_output_grad_desc, output_grad_data + i * group_offset_out,
-                    cudnn_filter_desc, filter_data + i * group_offset_filter,
-                    cudnn_conv_desc,
-                    cudnn_input_desc, input_grad_data + i * group_offset_in,
-                    1, &algoCount, &perfRes, miopen_workspace, workspace_size_in_bytes, false));
-            };
-            workspace_handle.RunFunc(miopen_find_bd_data_func,workspace_size_in_bytes);
             auto cudnn_func = [&](void* miopen_workspace) {
                 PADDLE_ENFORCE(platform::dynload::miopenConvolutionBackwardData(
                     handle, &alpha,
@@ -646,20 +646,19 @@ class CUDNNConvGradOpKernel : public framework::OpKernel<T> {
     // ------------------- cudnn conv backward filter ---------------------
     if (filter_grad) {
       T* filter_grad_data = filter_grad->mutable_data<T>(ctx.GetPlace());
+      auto miopen_find_bd_f_func = [&](void* miopen_workspace) {
+        PADDLE_ENFORCE(platform::dynload::miopenFindConvolutionBackwardWeightsAlgorithm(
+            handle,
+            cudnn_output_grad_desc, output_grad_data,
+            cudnn_input_desc, input_data,
+            cudnn_conv_desc,
+            cudnn_filter_desc, filter_grad_data,
+            1, &algoCount, &perfRes,
+            miopen_workspace, workspace_size_in_bytes, false));
+      };
+      workspace_handle.RunFunc(miopen_find_bd_f_func,workspace_size_in_bytes);
       // Because beta is zero, it is unnecessary to reset filter_grad.
       for (int i = 0; i < groups; i++) {
-            auto miopen_find_bd_f_func = [&](void* miopen_workspace) {
-                PADDLE_ENFORCE(platform::dynload::miopenFindConvolutionBackwardWeightsAlgorithm(
-                    handle,
-                    cudnn_output_grad_desc, output_grad_data + i * group_offset_out,
-                    cudnn_input_desc, input_data + i * group_offset_in,
-                    cudnn_conv_desc,
-                    cudnn_filter_desc, filter_grad_data + i * group_offset_filter,
-                    1, &algoCount, &perfRes,
-                    miopen_workspace, workspace_size_in_bytes, false));
-            };
-            workspace_handle.RunFunc(miopen_find_bd_f_func,workspace_size_in_bytes);
-
             auto cudnn_func = [&](void* miopen_workspace) {
             PADDLE_ENFORCE(platform::dynload::miopenConvolutionBackwardWeights(
                 handle, &alpha,
