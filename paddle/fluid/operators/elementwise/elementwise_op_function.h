@@ -451,7 +451,7 @@ static void ElemwiseGradBroadcast2CPU(const T *x, const T *y, const T *out,
   }
 }
 
-#ifdef __NVCC__
+#if defined(__NVCC__) || defined(__HIPCC__)
 template <typename T, typename DX_OP, typename DY_OP>
 static __global__ void ElemwiseGradBroadcast2CUDAKernel(
     const T *x, const T *y, const T *out, const T *dout, int pre, int n,
@@ -541,7 +541,7 @@ void ElemwiseGradComputeWithBroadcast(
     int h = pre;
     int w = n;
     if (platform::is_gpu_place(ctx.GetPlace())) {
-#ifdef __NVCC__
+#if defined(__NVCC__) || defined(__HIPCC__)
       ElemwiseGradBroadcast1CUDA(
           ctx.template device_context<DeviceContext>().stream(), x.data<T>(),
           y.data<T>(), out.data<T>(), dout.data<T>(), h, w, dx_op, dy_op,
@@ -556,7 +556,7 @@ void ElemwiseGradComputeWithBroadcast(
     }
   } else {
     if (platform::is_gpu_place(ctx.GetPlace())) {
-#ifdef __NVCC__
+#if defined(__NVCC__) || defined(__HIPCC__)
       ElemwiseGradBroadcast2CUDA(
           ctx.template device_context<DeviceContext>().stream(), x.data<T>(),
           y.data<T>(), out.data<T>(), dout.data<T>(), pre, n, post, dx_op,
@@ -811,7 +811,7 @@ static void FusedElemwiseAndActBroadcast2CPU(const T *x, const T *y, int pre,
   }
 }
 
-#ifdef __NVCC__
+#if defined(__NVCC__) || defined(__HIPCC__)
 template <typename T, typename CompoundFunctor, bool BcastY,
           bool KeepIntermediateOut, bool SameShapeOfIntermediateOutAndOut>
 static __global__ void FusedElemwiseAndActBroadcast1CUDAKernel(
@@ -965,7 +965,7 @@ void FusedElemwiseAndActComputeWithBroadcast(
     int h = pre;
     int w = n;
     if (platform::is_gpu_place(ctx.GetPlace())) {
-#ifdef __NVCC__
+#if defined(__NVCC__) || defined(__HIPCC__)
       FusedElemwiseAndActBroadcast1CUDA<T, CompoundFunctor, BcastY,
                                         KeepIntermediateOut,
                                         SameShapeOfIntermediateOutAndOut>(
@@ -988,7 +988,7 @@ void FusedElemwiseAndActComputeWithBroadcast(
     }
   } else {
     if (platform::is_gpu_place(ctx.GetPlace())) {
-#ifdef __NVCC__
+#if defined(__NVCC__) || defined(__HIPCC__)
       FusedElemwiseAndActBroadcast2CUDA<T, CompoundFunctor, BcastY,
                                         KeepIntermediateOut,
                                         SameShapeOfIntermediateOutAndOut>(
@@ -1230,7 +1230,7 @@ static void FusedElemwiseAndActGradBroadcast2CPU(
   }
 }
 
-#ifdef __NVCC__
+#if defined(__NVCC__) || defined(__HIPCC__)
 template <typename T, typename DX_OP, typename DY_OP, typename DIntermediate_OP,
           bool UseIntermediateOut, bool BcastY,
           bool SameShapeOfIntermediateOutAndOut>
@@ -1484,7 +1484,7 @@ void FusedElemwiseAndActGradComputeWithBroadcast(
     int h = pre;
     int w = n;
     if (platform::is_gpu_place(ctx.GetPlace())) {
-#ifdef __NVCC__
+#if defined(__NVCC__) || defined(__HIPCC__)
       FusedElemwiseAndActGradBroadcast1CUDA<T, DX_OP, DY_OP, DIntermediate_OP,
                                             UseIntermediateOut, BcastY,
                                             SameShapeOfIntermediateOutAndOut>(
@@ -1511,7 +1511,7 @@ void FusedElemwiseAndActGradComputeWithBroadcast(
     }
   } else {
     if (platform::is_gpu_place(ctx.GetPlace())) {
-#ifdef __NVCC__
+#if defined(__NVCC__) || defined(__HIPCC__)
       FusedElemwiseAndActGradBroadcast2CUDA<T, DX_OP, DY_OP, DIntermediate_OP,
                                             UseIntermediateOut, BcastY,
                                             SameShapeOfIntermediateOutAndOut>(
