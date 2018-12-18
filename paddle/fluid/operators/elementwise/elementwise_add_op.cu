@@ -21,11 +21,17 @@ REGISTER_OP_CUDA_KERNEL(
     elementwise_add, ops::ElementwiseAddKernel<plat::CUDADeviceContext, float>,
     ops::ElementwiseAddKernel<plat::CUDADeviceContext, double>,
     ops::ElementwiseAddKernel<plat::CUDADeviceContext, int>,
+#ifndef PADDLE_WITH_HIP
     ops::ElementwiseAddKernel<plat::CUDADeviceContext, int64_t>,
+#endif
     ops::ElementwiseAddKernel<plat::CUDADeviceContext, paddle::platform::float16>);
 REGISTER_OP_CUDA_KERNEL(
     elementwise_add_grad,
     ops::ElementwiseAddGradKernel<plat::CUDADeviceContext, float>,
     ops::ElementwiseAddGradKernel<plat::CUDADeviceContext, double>,
+#ifdef PADDLE_WITH_HIP
+    ops::ElementwiseAddGradKernel<plat::CUDADeviceContext, int>);
+#else
     ops::ElementwiseAddGradKernel<plat::CUDADeviceContext, int>,
     ops::ElementwiseAddGradKernel<plat::CUDADeviceContext, int64_t>);
+#endif
