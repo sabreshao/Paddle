@@ -31,7 +31,6 @@ template <typename T>
 class PoolCUDNNOpKernel : public framework::OpKernel<T> {
  public:
   void Compute(const framework::ExecutionContext &ctx) const override {
-#ifdef CUDNN_PORTING
     PADDLE_ENFORCE(platform::is_gpu_place(ctx.GetPlace()),
                    "It must use CUDAPlace.");
 
@@ -85,16 +84,18 @@ class PoolCUDNNOpKernel : public framework::OpKernel<T> {
     auto handle = ctx.cuda_device_context().miopen_handle();
     ScalingParamType<T> alpha = 1.0f, beta = 0.0f;
     size_t workspace_size_in_bytes;  // final workspace to allocate.
+
     PADDLE_ENFORCE(platform::dynload::miopenPoolingGetWorkSpaceSize(
         cudnn_output_desc, &workspace_size_in_bytes));
-    // Allocate on GPU memory
-    platform::CUDAPlace gpu = boost::get<platform::CUDAPlace>(ctx.GetPlace());
-    auto cudnn_workspace = paddle::memory::Alloc(gpu, workspace_size_in_bytes);
 
-    PADDLE_ENFORCE(platform::dynload::miopenPoolingForward(
+    auto& dev_ctx = ctx.template device_context<platform::CUDADeviceContext>();
+    auto workspace_handle = dev_ctx.miopen_workspace_handle();
+    auto miopen_func = [&](void* miopen_workspace){
+      PADDLE_ENFORCE(platform::dynload::miopenPoolingForward(
         handle, cudnn_pool_desc, &alpha, cudnn_input_desc, input_data, &beta,
-        cudnn_output_desc, output_data, false, (T*)(cudnn_workspace.get()), workspace_size_in_bytes));
-#endif
+        cudnn_output_desc, output_data, false, miopen_workspace, workspace_size_in_bytes));
+    };
+    workspace_handle.RunFunc(miopen_func, workspace_size_in_bytes);
   }
 };
 
@@ -102,7 +103,6 @@ template <typename T>
 class PoolCUDNNGradOpKernel : public framework::OpKernel<T> {
  public:
   void Compute(const framework::ExecutionContext &ctx) const override {
-#ifdef CUDNN_PORTING
     PADDLE_ENFORCE(platform::is_gpu_place(ctx.GetPlace()),
                    "It must use CUDAPlace.");
 
@@ -166,20 +166,21 @@ class PoolCUDNNGradOpKernel : public framework::OpKernel<T> {
     ScalingParamType<T> alpha = 1.0f, beta = 0.0f;
     if (input_grad) {
       T *input_grad_data = input_grad->mutable_data<T>(ctx.GetPlace());
-      // Because beta is zero, it is unnecessary to reset input_grad.
+
       size_t workspace_size_in_bytes;  // final workspace to allocate.
       PADDLE_ENFORCE(platform::dynload::miopenPoolingGetWorkSpaceSize(
           cudnn_output_desc, &workspace_size_in_bytes));
-      // Allocate on GPU memory
-      platform::CUDAPlace gpu = boost::get<platform::CUDAPlace>(ctx.GetPlace());
-      auto cudnn_workspace = paddle::memory::Alloc(gpu, workspace_size_in_bytes);
-
-      PADDLE_ENFORCE(platform::dynload::miopenPoolingBackward(
+      // Because beta is zero, it is unnecessary to reset input_grad.
+      auto& dev_ctx = ctx.template device_context<platform::CUDADeviceContext>();
+      auto workspace_handle = dev_ctx.miopen_workspace_handle();
+      auto miopen_func = [&](void* miopen_workspace){
+        PADDLE_ENFORCE(platform::dynload::miopenPoolingBackward(
           handle, cudnn_pool_desc, &alpha, cudnn_output_desc, output_data,
           cudnn_output_desc, output_grad_data, cudnn_input_desc, input_data,
-          &beta, cudnn_input_desc, input_grad_data, (T*)(cudnn_workspace.get())));
+          &beta, cudnn_input_desc, input_grad_data, miopen_workspace));
+      };
+      workspace_handle.RunFunc(miopen_func, workspace_size_in_bytes);
     }
-#endif
   }
 };
 
