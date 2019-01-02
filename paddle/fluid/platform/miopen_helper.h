@@ -68,10 +68,9 @@ inline miopenPoolingMode_t GetPoolingMode(const PoolingMode& mode) {
     case PoolingMode::kMaximum:
       return miopenPoolingMax;
     case PoolingMode::kAverageExclusive:
-      LOG(WARNING)<<"MIOpen currently implementation only support inclusive avg pooling, "
-                  <<"using exclusive may result in calculation fail";
       return miopenPoolingAverage;
     case PoolingMode::kAverageInclusive:
+      // TODO: add inclusive avg pool when MLOpen is ready
       return miopenPoolingAverage;
     default:
       PADDLE_THROW("Unexpected pooling mode.");
