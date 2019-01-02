@@ -225,13 +225,13 @@ class RmspropOpKernel : public framework::OpKernel<T> {
 
       platform::ForRange<DeviceContext> for_range(dev_ctx, limit);
       const int64_t *rows;
-#ifdef PADDLE_WITH_CUDA
+#if defined(PADDLE_WITH_CUDA)||defined(PADDLE_WITH_HIP)
       if (platform::is_gpu_place(ctx.GetPlace())) {
         rows = merged_grad->rows().CUDAData(ctx.GetPlace());
       } else {
 #endif
         rows = merged_grad->rows().data();
-#ifdef PADDLE_WITH_CUDA
+#if defined(PADDLE_WITH_CUDA)||defined(PADDLE_WITH_HIP)
       }
 #endif
       auto &merged_tensor = merged_grad->value();
