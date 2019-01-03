@@ -8,5 +8,5 @@ add_subdirectory(recordio)
 add_subdirectory(pybind)
 
 # NOTE: please add subdirectory inference at last.
-add_subdirectory(inference)
-add_subdirectory(train)
+#add_subdirectory(inference)
+#add_subdirectory(train)
