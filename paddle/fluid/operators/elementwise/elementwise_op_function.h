@@ -15,6 +15,7 @@ limitations under the License. */
 #pragma once
 
 #include <glog/logging.h>
+#include "hip/hip_runtime.h"
 #include <algorithm>
 #include <iterator>
 #include <vector>
@@ -23,12 +24,11 @@ limitations under the License. */
 #include "paddle/fluid/framework/operator.h"
 #include "paddle/fluid/platform/transform.h"
 
-#ifdef __NVCC__
-#include <cuda.h>
+#ifdef __HCC__
 #include <thrust/iterator/iterator_adaptor.h>
 #include "paddle/fluid/platform/cuda_device_function.h"
 #include "paddle/fluid/platform/cuda_primitives.h"
-constexpr int ELEMWISE_MAX_BLOCK_DIM = 1024;
+constexpr int ELEMWISE_MAX_BLOCK_DIM = 256;
 #endif
 
 #include "paddle/fluid/operators/math/math_function.h"
@@ -195,7 +195,7 @@ class MidWiseTransformIterator<T, platform::CPUDeviceContext>
   int64_t post_;
 };
 
-#ifdef __NVCC__
+#ifdef __HCC__
 template <typename T>
 class RowwiseTransformIterator<T, platform::CUDADeviceContext>
     : public thrust::iterator_adaptor<
@@ -383,7 +383,7 @@ static void ElemwiseGradBroadcast1CPU(const T *x, const T *y, const T *out,
   }
 }
 
-#ifdef __NVCC__
+#ifdef __HIPCC__
 template <typename T, typename DX_OP, typename DY_OP>
 static __global__ void ElemwiseGradBroadcast1CUDAKernel(
     const T *x, const T *y, const T *out, const T *dout, int h, int w,
@@ -414,13 +414,13 @@ static __global__ void ElemwiseGradBroadcast1CUDAKernel(
 }
 
 template <typename T, typename DX_OP, typename DY_OP>
-static void ElemwiseGradBroadcast1CUDA(cudaStream_t stream, const T *x,
+static void ElemwiseGradBroadcast1CUDA(hipStream_t stream, const T *x,
                                        const T *y, const T *out, const T *dout,
                                        int h, int w, DX_OP dx_op, DY_OP dy_op,
                                        T *dx, T *dy) {
   int block_size = std::min(ELEMWISE_MAX_BLOCK_DIM, h);
   int gird_size = w;
-  ElemwiseGradBroadcast1CUDAKernel<<<gird_size, block_size, 0, stream>>>(
+  hipLaunchKernelGGL(ElemwiseGradBroadcast1CUDAKernel, dim3(gird_size), dim3(block_size), 0, stream,
       x, y, out, dout, h, w, dx_op, dy_op, dx, dy);
 }
 
@@ -491,13 +491,13 @@ static __global__ void ElemwiseGradBroadcast2CUDAKernel(
 }
 
 template <typename T, typename DX_OP, typename DY_OP>
-static void ElemwiseGradBroadcast2CUDA(cudaStream_t stream, const T *x,
+static void ElemwiseGradBroadcast2CUDA(hipStream_t stream, const T *x,
                                        const T *y, const T *out, const T *dout,
                                        int pre, int n, int post, DX_OP dx_op,
                                        DY_OP dy_op, T *dx, T *dy) {
   int block_size = std::min(ELEMWISE_MAX_BLOCK_DIM, pre * post);
   int gird_size = n;
-  ElemwiseGradBroadcast2CUDAKernel<<<gird_size, block_size, 0, stream>>>(
+  hipLaunchKernelGGL(ElemwiseGradBroadcast2CUDAKernel, dim3(gird_size), dim3(block_size), 0, stream,
       x, y, out, dout, pre, n, post, dx_op, dy_op, dx, dy);
 }
 
@@ -852,16 +852,16 @@ static __global__ void FusedElemwiseAndActBroadcast1CUDAKernel(
 
 template <typename T, typename CompoundFunctor, bool BcastY,
           bool KeepIntermediateOut, bool SameShapeOfIntermediateOutAndOut>
-static void FusedElemwiseAndActBroadcast1CUDA(cudaStream_t stream, const T *x,
+static void FusedElemwiseAndActBroadcast1CUDA(hipStream_t stream, const T *x,
                                               const T *y,
                                               CompoundFunctor compound_functor,
                                               int h, int w, T *out,
                                               T *intermediate_out) {
   int block_size = std::min(ELEMWISE_MAX_BLOCK_DIM, h);
   int gird_size = w;
-  FusedElemwiseAndActBroadcast1CUDAKernel<
+  hipLaunchKernelGGL(FusedElemwiseAndActBroadcast1CUDAKernel<
       T, CompoundFunctor, BcastY, KeepIntermediateOut,
-      SameShapeOfIntermediateOutAndOut><<<gird_size, block_size, 0, stream>>>(
+      SameShapeOfIntermediateOutAndOut>, dim3(gird_size), dim3(block_size), 0, stream,
       x, y, h, w, compound_functor, out, intermediate_out);
 }
 
@@ -909,7 +909,7 @@ static __global__ void FusedElemwiseAndActBroadcast2CUDAKernel(
 
 template <typename T, typename CompoundFunctor, bool BcastY,
           bool KeepIntermediateOut, bool SameShapeOfIntermediateOutAndOut>
-static void FusedElemwiseAndActBroadcast2CUDA(cudaStream_t stream, const T *x,
+static void FusedElemwiseAndActBroadcast2CUDA(hipStream_t stream, const T *x,
                                               const T *y, int pre, int n,
                                               int post,
                                               CompoundFunctor compound_functor,
@@ -917,9 +917,9 @@ static void FusedElemwiseAndActBroadcast2CUDA(cudaStream_t stream, const T *x,
   int block_size = std::min(ELEMWISE_MAX_BLOCK_DIM, pre * post);
   int gird_size = n;
 
-  FusedElemwiseAndActBroadcast2CUDAKernel<
+  hipLaunchKernelGGL(FusedElemwiseAndActBroadcast2CUDAKernel<
       T, CompoundFunctor, BcastY, KeepIntermediateOut,
-      SameShapeOfIntermediateOutAndOut><<<gird_size, block_size, 0, stream>>>(
+      SameShapeOfIntermediateOutAndOut>, dim3(gird_size), dim3(block_size), 0, stream,
       x, y, compound_functor, pre, n, post, out, intermediate_out);
 }
 
@@ -1329,14 +1329,14 @@ template <typename T, typename DX_OP, typename DY_OP, typename DIntermediate_OP,
           bool UseIntermediateOut, bool BcastY,
           bool SameShapeOfIntermediateOutAndOut>
 static void FusedElemwiseAndActGradBroadcast1CUDA(
-    cudaStream_t stream, const T *x, const T *y, const T *intermediate_out,
+    hipStream_t stream, const T *x, const T *y, const T *intermediate_out,
     const T *out, const T *dout, int h, int w, DX_OP dx_op, DY_OP dy_op,
     DIntermediate_OP dintermediate_op, T *dx, T *dy, T *d_intermediate) {
   int block_size = std::min(ELEMWISE_MAX_BLOCK_DIM, h);
   int gird_size = w;
-  FusedElemwiseAndActGradBroadcast1CUDAKernel<
+  hipLaunchKernelGGL(FusedElemwiseAndActGradBroadcast1CUDAKernel<
       T, DX_OP, DY_OP, DIntermediate_OP, UseIntermediateOut, BcastY,
-      SameShapeOfIntermediateOutAndOut><<<gird_size, block_size, 0, stream>>>(
+      SameShapeOfIntermediateOutAndOut>, dim3(gird_size), dim3(block_size), 0, stream,
       x, y, intermediate_out, out, dout, h, w, dx_op, dy_op, dintermediate_op,
       dx, dy, d_intermediate);
 }
@@ -1443,15 +1443,15 @@ template <typename T, typename DX_OP, typename DY_OP, typename DIntermediate_OP,
           bool UseIntermediateOut, bool BcastY,
           bool SameShapeOfIntermediateOutAndOut>
 static void FusedElemwiseAndActGradBroadcast2CUDA(
-    cudaStream_t stream, const T *x, const T *y, const T *intermediate_out,
+    hipStream_t stream, const T *x, const T *y, const T *intermediate_out,
     const T *out, const T *dout, int pre, int n, int post, DX_OP dx_op,
     DY_OP dy_op, DIntermediate_OP dintermediate_op, T *dx, T *dy,
     T *dintermediate) {
   int block_size = std::min(ELEMWISE_MAX_BLOCK_DIM, pre * post);
   int gird_size = n;
-  FusedElemwiseAndActGradBroadcast2CUDAKernel<
+  hipLauncKernelGGL(FusedElemwiseAndActGradBroadcast2CUDAKernel<
       T, DX_OP, DY_OP, DIntermediate_OP, UseIntermediateOut, BcastY,
-      SameShapeOfIntermediateOutAndOut><<<gird_size, block_size, 0, stream>>>(
+      SameShapeOfIntermediateOutAndOut>, dim3(gird_size), block_size, 0, stream,
       x, y, intermediate_out, out, dout, pre, n, post, dx_op, dy_op,
       dintermediate_op, dx, dy, dintermediate);
 }
