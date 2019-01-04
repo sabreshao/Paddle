@@ -27,13 +27,14 @@
 #ifndef _WIN32
 #include <nccl.h>
 #endif
+
 #endif
 
 // Users should add forward declarations here
 namespace paddle {
 
 namespace platform {
-#ifdef PADDLE_WITH_CUDA
+#if defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP)
 #ifndef _WIN32
 class Communicator;
 #endif
@@ -143,6 +144,9 @@ using VarTypeRegistry = detail::VarTypeRegistryImpl<
 #ifdef PADDLE_WITH_CUDA
 #ifndef _WIN32
     ncclUniqueId, platform::Communicator,
+#endif
+#ifdef PADDLE_WITH_HIP
+    rcclUniqueId, platform::Communicator,
 #endif
     operators::AlgorithmsCache<cudnnConvolutionFwdAlgo_t>,
     operators::AlgorithmsCache<cudnnConvolutionBwdDataAlgo_t>,

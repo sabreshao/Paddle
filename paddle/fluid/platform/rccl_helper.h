@@ -14,26 +14,36 @@
 
 #pragma once
 
-#include <thread>
+#include <stdio.h>
+#include <string>
+#include <thread>  // NOLINT
 #include <typeindex>
+#include <vector>
+#include "paddle/fluid/framework/data_type.h"
 #include "paddle/fluid/platform/dynload/rccl.h"
 #include "paddle/fluid/platform/enforce.h"
+#include "paddle/fluid/platform/float16.h"
 
 #define NCCL_ID_VARNAME "NCCLID"
 
 namespace paddle {
 namespace platform {
 
-inline rcclDataType_t ToNCCLDataType(std::type_index type) {
-  if (type == typeid(float)) {  // NOLINT
+inline rcclDataType_t ToNCCLDataType(framework::proto::VarType::Type type) {
+  if (type == framework::proto::VarType::FP32) {
     return rcclFloat;
-  } else if (type == typeid(double)) {  // NOLINT
+  } else if (type == framework::proto::VarType::FP64) {
     return rcclDouble;
-  } else if (type == typeid(int)) {  // NOLINT
+  } else if (type == framework::proto::VarType::INT32) {
     return rcclInt;
+  } else if (type == framework::proto::VarType::INT64) {
+    return rcclInt64;
+  } else if (type == framework::proto::VarType::FP16) {
+    return rcclHalf;
   } else {
     PADDLE_THROW("Not supported");
   }
+  
 }
 
 class NCCLGroupGuard {
@@ -86,27 +96,33 @@ struct NCCLContextMap {
         order_.size(), contexts_.size(),
         "NCCL Context Map does not support contain two or more same device");
 
-    if (places.size() <= 1) {
+    if (places.size() <= 1 && num_trainers == 1) {
       return;
     }
     std::unique_ptr<rcclComm_t[]> comms(new rcclComm_t[order_.size()]);
-    // if pass nccl_id here, can assume we are doing multi node training
-    if (nccl_id == nullptr) {
+    // if num_trainers == 1, should create a new nccl id for local comms.
+    if (num_trainers == 1 && nccl_id == nullptr) {
       std::lock_guard<std::mutex> guard(NCCLGroupGuard::NCCLMutex());
       PADDLE_ENFORCE(platform::dynload::rcclCommInitAll(
           comms.get(), static_cast<int>(order_.size()), order_.data()));
     } else {
-      PADDLE_ENFORCE_GT(num_trainers, 1);
-      // TODO(wuyi): need to ensure each node have same number of GPUs
+      PADDLE_ENFORCE_NOT_NULL(nccl_id);
       {
         int nranks = num_trainers * order_.size();
         NCCLGroupGuard gurad;
-        for (auto &gpu_id : order_) {
-          int rank = trainer_id * order_.size() + gpu_id;
-          VLOG(3) << "init nccl rank: " << rank << " nranks: " << nranks;
+        for (size_t i = 0; i < order_.size(); ++i) {
+          int gpu_id = order_[i];
+          int rank;
+          if (order_.size() > 1) {
+            rank = trainer_id * order_.size() + i;
+          } else {
+            rank = trainer_id;
+          }
+          VLOG(30) << "init nccl rank: " << rank << " nranks: " << nranks
+                   << "gpu id: " << gpu_id;
           PADDLE_ENFORCE(hipSetDevice(gpu_id));
           PADDLE_ENFORCE(platform::dynload::rcclCommInitRank(
-              comms.get() + gpu_id, nranks, *nccl_id, rank));
+              comms.get() + i, nranks, *nccl_id, rank));
         }
       }
     }
