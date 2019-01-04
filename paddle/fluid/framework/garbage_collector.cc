@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include <algorithm>
-#ifdef PADDLE_WITH_CUDA
+#if defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP)
 #include "paddle/fluid/platform/cuda_device_guard.h"
 #endif
 #include "paddle/fluid/framework/garbage_collector.h"
@@ -36,7 +36,7 @@ void CPUGarbageCollector::ClearCallback(const std::function<void()> &callback) {
   callback();
 }
 
-#ifdef PADDLE_WITH_CUDA
+#if defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP)
 UnsafeFastGPUGarbageCollector::UnsafeFastGPUGarbageCollector(
     const platform::CUDAPlace &place, size_t max_memory_size)
     : GarbageCollector(place, max_memory_size) {}
@@ -60,7 +60,9 @@ void DefaultStreamGarbageCollector::ClearCallback(
   static_cast<platform::CUDADeviceContext *>(this->dev_ctx_)
       ->AddStreamCallback(callback);
 }
+#endif
 
+#ifdef PADDLE_WITH_CUDA
 StreamGarbageCollector::StreamGarbageCollector(const platform::CUDAPlace &place,
                                                size_t max_memory_size)
     : GarbageCollector(place, max_memory_size) {
@@ -77,7 +79,28 @@ StreamGarbageCollector::~StreamGarbageCollector() {
 }
 
 cudaStream_t StreamGarbageCollector::stream() const { return stream_; }
+#endif
 
+#ifdef PADDLE_WITH_HIP
+StreamGarbageCollector::StreamGarbageCollector(const platform::CUDAPlace &place,
+                                               size_t max_memory_size)
+    : GarbageCollector(place, max_memory_size) {
+  platform::CUDADeviceGuard guard(place.device);
+  PADDLE_ENFORCE(hipStreamCreate(&stream_));
+  callback_manager_.reset(new platform::StreamCallbackManager(stream_));
+}
+
+StreamGarbageCollector::~StreamGarbageCollector() {
+  auto place = boost::get<platform::CUDAPlace>(this->dev_ctx_->GetPlace());
+  platform::CUDADeviceGuard guard(place.device);
+  PADDLE_ENFORCE(hipStreamSynchronize(stream_));
+  PADDLE_ENFORCE(hipStreamDestroy(stream_));
+}
+
+hipStream_t StreamGarbageCollector::stream() const { return stream_; }
+#endif
+
+#if defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP)
 void StreamGarbageCollector::Wait() const { callback_manager_->Wait(); }
 
 void StreamGarbageCollector::ClearCallback(
