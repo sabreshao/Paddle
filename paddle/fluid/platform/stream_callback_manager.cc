@@ -20,6 +20,9 @@ namespace platform {
 
 #if CUDA_VERSION >= 10000
 static void CUDART_CB StreamCallbackFunc(void *user_data)
+#elif defined(PADDLE_WITH_HIP)
+static void StreamCallbackFunc(hipStream_t stream,
+                                         hipError_t status, void *user_data)
 #else
 static void CUDART_CB StreamCallbackFunc(cudaStream_t stream,
                                          cudaError_t status, void *user_data)
@@ -30,7 +33,11 @@ static void CUDART_CB StreamCallbackFunc(cudaStream_t stream,
   (*func)();
 }
 
+#ifdef PADDLE_WITH_HIP
+StreamCallbackManager::StreamCallbackManager(const hipStream_t stream)
+#else
 StreamCallbackManager::StreamCallbackManager(const cudaStream_t stream)
+#endif
     : stream_(stream), thread_pool_(1) {}
 
 void StreamCallbackManager::AddCallback(std::function<void()> callback) const {
@@ -44,13 +51,19 @@ void StreamCallbackManager::AddCallback(std::function<void()> callback) const {
   });
 #if CUDA_VERSION >= 10000
   PADDLE_ENFORCE(cudaLaunchHostFunc(stream_, StreamCallbackFunc, func));
+#elif defined(PADDLE_WITH_HIP)
+  PADDLE_ENFORCE(hipStreamAddCallback(stream_, StreamCallbackFunc, func, 0));
 #else
   PADDLE_ENFORCE(cudaStreamAddCallback(stream_, StreamCallbackFunc, func, 0));
 #endif
 }
 
 void StreamCallbackManager::Wait() const {
+#ifdef PADDLE_WITH_HIP
+  PADDLE_ENFORCE(hipStreamSynchronize(stream_));
+#else
   PADDLE_ENFORCE(cudaStreamSynchronize(stream_));
+#endif
   {
     std::lock_guard<std::mutex> lock(mtx_);
     if (last_future_.valid()) {
