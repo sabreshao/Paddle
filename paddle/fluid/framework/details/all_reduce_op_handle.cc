@@ -102,7 +102,7 @@ void AllReduceOpHandle::RunImpl() {
 #ifdef PADDLE_WITH_HIP
       all_reduce_calls.emplace_back([=] {
         PADDLE_ENFORCE(platform::dynload::rcclAllReduce(
-            buffer, buffer, numel, static_cast<ncclDataType_t>(dtype), ncclSum,
+            buffer, buffer, numel, static_cast<rcclDataType_t>(dtype), rcclSum,
             comm, stream));
       });
 #else
@@ -132,9 +132,9 @@ void AllReduceOpHandle::RunImpl() {
         auto &nccl_ctx = nccl_ctxs_->at(dev_id);
         auto stream = nccl_ctx.stream();
 #ifdef PADDLE_WITH_HIP
-        cudaStreamSynchronize(stream);
-#else
         hipStreamSynchronize(stream);
+#else
+        cudaStreamSynchronize(stream);
 #endif
       }
     }
