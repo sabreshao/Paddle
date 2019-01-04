@@ -54,14 +54,14 @@ class Array {
   }
 
   HOSTDEVICE inline T &at(size_t i) {
-#ifndef __CUDA_ARCH__
+#if !defined(__CUDA_ARCH__) && !defined(__HIP_DEVICE_COMPILE__)
     PADDLE_ENFORCE_LT(i, N, "Array index out of bounds");
 #endif
     return (*this)[i];
   }
 
   HOSTDEVICE inline const T &at(size_t i) const {
-#ifndef __CUDA_ARCH__
+#if !defined(__CUDA_ARCH__) && !defined(__HIP_DEVICE_COMPILE__)
     PADDLE_ENFORCE_LT(i, N, "Array index out of bounds");
 #endif
     return (*this)[i];
@@ -104,6 +104,7 @@ class Array<T, 0> {
 #ifdef __CUDA_ARCH__
     static T obj();
     return obj;
+#elif defined(__HIP_DEVICE_COMPILE__)
 #else
     PADDLE_THROW("Array<T, 0> has no element");
 #endif
@@ -113,6 +114,7 @@ class Array<T, 0> {
 #ifdef __CUDA_ARCH__
     static const T obj();
     return obj;
+#elif defined(__HIP_DEVICE_COMPILE__)
 #else
     PADDLE_THROW("Array<T, 0> has no element");
 #endif
