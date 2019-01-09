@@ -12,6 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
+#include "hip/hip_runtime.h"
 #include "paddle/fluid/operators/math/prelu.h"
 
 namespace paddle {
@@ -68,69 +69,69 @@ __global__ void PReluScalarKernel(const T *input, const T *alpha, T *output,
 }
 
 template <typename T>
-static inline void PReluChannelWise(cudaStream_t stream, const T *input,
+static inline void PReluChannelWise(hipStream_t stream, const T *input,
                                     const T *alpha, T *output,
                                     std::vector<int> input_shape) {
   size_t unroll = input_shape[0] * input_shape[1];
   size_t spatial_size = input_shape[2] * input_shape[3];
   CHECK_LT(unroll, CUDA_MAX_NUM_BLOCKS);
-  PReluChannelWiseKernel<<<unroll, CUDA_NUM_THREADS, 0, stream>>>(
+  hipLaunchKernelGGL((PReluChannelWiseKernel), dim3(unroll), dim3(CUDA_NUM_THREADS), 0, stream,
       input, alpha, output, input_shape[1], spatial_size);
 }
 
 template <typename T>
-static inline void PReluElementWise(cudaStream_t stream, const T *input,
+static inline void PReluElementWise(hipStream_t stream, const T *input,
                                     const T *alpha, T *output,
                                     std::vector<int> input_shape) {
   size_t unroll = input_shape[0] * input_shape[1];
   size_t spatial_size = input_shape[2] * input_shape[3];
   CHECK_LT(unroll, CUDA_MAX_NUM_BLOCKS);
-  PReluElementWiseKernel<<<unroll, CUDA_NUM_THREADS, 0, stream>>>(
+  hipLaunchKernelGGL((PReluElementWiseKernel), dim3(unroll), dim3(CUDA_NUM_THREADS), 0, stream,
       input, alpha, output, spatial_size);
 }
 
 template <typename T>
-static inline void PReluScalar(cudaStream_t stream, const T *input,
+static inline void PReluScalar(hipStream_t stream, const T *input,
                                const T *alpha, T *output,
                                std::vector<int> input_shape) {
   size_t unroll = input_shape[0] * input_shape[1];
   size_t spatial_size = input_shape[2] * input_shape[3];
   CHECK_LT(unroll, CUDA_MAX_NUM_BLOCKS);
-  PReluScalarKernel<<<unroll, CUDA_NUM_THREADS, 0, stream>>>(
+  hipLaunchKernelGGL((PReluScalarKernel), dim3(unroll), dim3(CUDA_NUM_THREADS), 0, stream,
       input, alpha, output, spatial_size);
 }
 
 template <typename T>
 void PreluChannelWiseDirectCUDAFunctor<T>::operator()(
-    cudaStream_t stream, const T *input, const T *alpha, T *output,
+    hipStream_t stream, const T *input, const T *alpha, T *output,
     std::vector<int> input_shape) {
   size_t unroll = input_shape[0] * input_shape[1];
   size_t spatial_size = input_shape[2] * input_shape[3];
   CHECK_LT(unroll, CUDA_MAX_NUM_BLOCKS);
-  PReluChannelWiseKernel<<<unroll, CUDA_NUM_THREADS, 0, stream>>>(
+  hipLaunchKernelGGL((PReluChannelWiseKernel), dim3(unroll), dim3(CUDA_NUM_THREADS), 0, stream,
       input, alpha, output, input_shape[1], spatial_size);
 }
 
 template <typename T>
 void PreluElementWiseDirectCUDAFunctor<T>::operator()(
-    cudaStream_t stream, const T *input, const T *alpha, T *output,
+    hipStream_t stream, const T *input, const T *alpha, T *output,
     std::vector<int> input_shape) {
   size_t unroll = input_shape[0] * input_shape[1];
   size_t spatial_size = input_shape[2] * input_shape[3];
   CHECK_LT(unroll, CUDA_MAX_NUM_BLOCKS);
-  PReluElementWiseKernel<<<unroll, CUDA_NUM_THREADS, 0, stream>>>(
+  hipLaunchKernelGGL((PReluElementWiseKernel), dim3(unroll), dim3(CUDA_NUM_THREADS), 0, stream,
       input, alpha, output, spatial_size);
 }
 
 template <typename T>
-void PreluScalarDirectCUDAFunctor<T>::operator()(cudaStream_t stream,
+void PreluScalarDirectCUDAFunctor<T>::operator()(hipStream_t stream,
                                                  const T *input, const T *alpha,
                                                  T *output,
                                                  std::vector<int> input_shape) {
   size_t unroll = input_shape[0] * input_shape[1];
   size_t spatial_size = input_shape[2] * input_shape[3];
   CHECK_LT(unroll, CUDA_MAX_NUM_BLOCKS);
-  PReluScalarKernel<<<unroll, CUDA_NUM_THREADS, 0, stream>>>(
+  hipLaunchKernelGGL((PReluScalarKernel), dim3(unroll), dim3(CUDA_NUM_THREADS), 0, stream,
       input, alpha, output, spatial_size);
 }
 
