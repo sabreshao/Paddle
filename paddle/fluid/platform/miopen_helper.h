@@ -59,16 +59,6 @@ enum ActivationMode {
   kBandPass,
 };
 
-enum ActivationMode {
-  kNone,  // activation identity
-  kSigmoid,
-  kRelu,
-  kRelu6,
-  kReluX,
-  kTanh,
-  kBandPass,
-};
-
 inline ActivationMode StringToActivationMode(const std::string& str) {
   if (str == "identity") {
     return ActivationMode::kNone;
