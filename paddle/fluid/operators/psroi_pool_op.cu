@@ -12,6 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
+#include "hip/hip_runtime.h"
 #include "paddle/fluid/operators/psroi_pool_op.h"
 #include "paddle/fluid/platform/cuda_primitives.h"
 
@@ -213,8 +214,7 @@ class GPUPSROIPoolOpKernel : public framework::OpKernel<T> {
     int threads = kNumCUDAThreads;
 
     // call cuda kernel function
-    GPUPSROIPoolForward<
-        T><<<blocks, threads, 0, ctx.cuda_device_context().stream()>>>(
+    hipLaunchKernelGGL((GPUPSROIPoolForward<T>), dim3(blocks), dim3(threads), 0, ctx.cuda_device_context().stream(),
         output_size, in->data<T>(), rois->data<T>(), spatial_scale,
         input_channels, height, width, output_channels, pooled_height,
         pooled_width, rois_batch_id_list_gpu.data<int>(),
@@ -269,8 +269,7 @@ class GPUPSROIPoolGradOpKernel : public framework::OpKernel<T> {
       int threads = kNumCUDAThreads;
 
       if (output_grad_size > 0) {
-        GPUPSROIPoolBackward<
-            T><<<blocks, threads, 0, ctx.cuda_device_context().stream()>>>(
+        hipLaunchKernelGGL((GPUPSROIPoolBackward<T>), dim3(blocks), dim3(threads), 0, ctx.cuda_device_context().stream(),
             output_grad_size, rois->data<T>(), output_grad->data<T>(),
             spatial_scale, input_channels, height, width, output_channels,
             pooled_height, pooled_width, rois_batch_id_list_gpu.data<int>(),
