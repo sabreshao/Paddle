@@ -19,14 +19,8 @@ namespace ops = paddle::operators;
 REGISTER_OP_CUDA_KERNEL(
     elementwise_div,
     ops::ElementwiseDivKernel<paddle::platform::CUDADeviceContext, float>,
-    ops::ElementwiseDivKernel<paddle::platform::CUDADeviceContext,
-                              paddle::platform::float16>,
-    ops::ElementwiseDivKernel<paddle::platform::CUDADeviceContext, double>,
     ops::ElementwiseDivKernel<paddle::platform::CUDADeviceContext, int>);
 REGISTER_OP_CUDA_KERNEL(
     elementwise_div_grad,
     ops::ElementwiseDivGradKernel<paddle::platform::CUDADeviceContext, float>,
-    ops::ElementwiseDivGradKernel<paddle::platform::CUDADeviceContext,
-                                  paddle::platform::float16>,
-    ops::ElementwiseDivGradKernel<paddle::platform::CUDADeviceContext, double>,
     ops::ElementwiseDivGradKernel<paddle::platform::CUDADeviceContext, int>);
