@@ -1449,15 +1449,9 @@ static void FusedElemwiseAndActGradBroadcast2CUDA(
     T *dintermediate) {
   int block_size = std::min(ELEMWISE_MAX_BLOCK_DIM, pre * post);
   int gird_size = n;
-<<<<<<< HEAD
-  hipLauncKernelGGL(FusedElemwiseAndActGradBroadcast2CUDAKernel<
-      T, DX_OP, DY_OP, DIntermediate_OP, UseIntermediateOut, BcastY,
-      SameShapeOfIntermediateOutAndOut>, dim3(gird_size), block_size, 0, stream,
-=======
   hipLaunchKernelGGL((FusedElemwiseAndActGradBroadcast2CUDAKernel<
       T, DX_OP, DY_OP, DIntermediate_OP, UseIntermediateOut, BcastY,
       SameShapeOfIntermediateOutAndOut>), dim3(gird_size), dim3(block_size), 0, stream,
->>>>>>> cbff6b8... Add HIP support to fluid/operator.
       x, y, intermediate_out, out, dout, pre, n, post, dx_op, dy_op,
       dintermediate_op, dx, dy, dintermediate);
 }
