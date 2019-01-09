@@ -42,6 +42,7 @@ struct TolerableValue {
 // if the scale value will be adjusted.
 // Also. In standard implementation of cross entropy, other
 // framework not has the ValueClipping.
+#ifndef PADDLE_WITH_HIP
 template <>
 struct TolerableValue<platform::float16> {
   HOSTDEVICE platform::float16 operator()(const platform::float16& x) const {
@@ -53,6 +54,7 @@ struct TolerableValue<platform::float16> {
       return std::numeric_limits<platform::float16>::min();
   }
 };
+#endif
 
 template <typename DeviceContext, typename T>
 class CrossEntropyFunctor {
