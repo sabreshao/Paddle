@@ -265,7 +265,7 @@ std::vector<ir::Node *> MultiDevSSAGraphBuilderBase::SortOperations(
 
 bool MultiDevSSAGraphBuilderBase::UseGPU() const {
   bool use_gpu = false;
-#if defined(PADDLE_WITH_CUDA) && !defined(_WIN32)
+#if (defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP)) && !defined(_WIN32)
   use_gpu = nccl_ctxs_ != nullptr;
 #endif
   return use_gpu;
@@ -313,17 +313,10 @@ void MultiDevSSAGraphBuilderBase::SetCommunicationContext(
 #endif
 }
 
-<<<<<<< 475fb03da24f5161ba7bb12c0a659ebbed7b0a3c
 void MultiDevSSAGraphBuilderBase::CreateBroadcastOp(ir::Graph *result,
                                                     const std::string &p_name,
                                                     size_t src_dev_id) const {
-#if defined(PADDLE_WITH_CUDA) && !defined(_WIN32)
-=======
-void MultiDevSSAGraphBuilder::CreateBroadcastOp(ir::Graph *result,
-                                                const std::string &p_name,
-                                                size_t src_dev_id) const {
 #if (defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP)) && !defined(_WIN32)
->>>>>>> Hipify framework.
   auto *op_handle = new BroadcastOpHandle(
       result->CreateEmptyNode("broadcast", ir::Node::Type::kOperation),
       local_scopes_, places_, nccl_ctxs_);
@@ -397,15 +390,9 @@ void MultiDevSSAGraphBuilderBase::CreateComputationalOp(ir::Graph *result,
   CreateOpHandleIOs(result, node, dev_id);
 }
 
-<<<<<<< 475fb03da24f5161ba7bb12c0a659ebbed7b0a3c
 void MultiDevSSAGraphBuilderBase::CreateAllReduceOp(
     ir::Graph *result, const std::string &og) const {
-#if defined(PADDLE_WITH_CUDA) && !defined(_WIN32)
-=======
-void MultiDevSSAGraphBuilder::InsertAllReduceOp(ir::Graph *result,
-                                                const std::string &og) const {
 #if (defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP)) && !defined(_WIN32)
->>>>>>> Hipify framework.
   result->Get<GraphOps>(kGraphOps).emplace_back(new AllReduceOpHandle(
       result->CreateEmptyNode("allreduce", ir::Node::Type::kOperation),
       local_scopes_, places_, nccl_ctxs_));
@@ -432,97 +419,7 @@ void MultiDevSSAGraphBuilder::InsertAllReduceOp(ir::Graph *result,
   }
 }
 
-<<<<<<< 475fb03da24f5161ba7bb12c0a659ebbed7b0a3c
 void MultiDevSSAGraphBuilderBase::CreateScaleLossGradOp(
-=======
-void MultiDevSSAGraphBuilder::InsertDataBalanceOp(
-    ir::Graph *result, const std::vector<std::string> &datas) const {
-#if (defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP)) && !defined(_WIN32)
-  result->Get<GraphOps>(kGraphOps).emplace_back(new DataBalanceOpHandle(
-      result->CreateEmptyNode("data_balance", ir::Node::Type::kOperation),
-      local_scopes_, places_, nccl_ctxs_));
-#else
-  result->Get<GraphOps>(kGraphOps).emplace_back(new DataBalanceOpHandle(
-      result->CreateEmptyNode("data_balance", ir::Node::Type::kOperation),
-      local_scopes_, places_));
-#endif
-  auto *op_handle = result->Get<GraphOps>(kGraphOps).back();
-  for (size_t i = 0; i < places_.size(); ++i) {
-    auto &p = places_[i];
-    SetCommunicationContext(op_handle, p);
-    for (const std::string &d_name : datas) {
-      auto &vars = result->Get<GraphVars>(kGraphVars)[i][d_name];
-      PADDLE_ENFORCE(!vars.empty());
-      op_handle->AddInput(vars.back());
-      auto var = new VarHandle(
-          result->CreateEmptyNode(d_name, ir::Node::Type::kVariable),
-          vars.size(), i, d_name, p);
-      vars.emplace_back(var);
-      op_handle->AddOutput(var);
-    }
-  }
-}
-
-int MultiDevSSAGraphBuilder::GetOpDeviceID(
-    ir::Node *node,
-    const std::unordered_map<std::string, int> &sharded_var_device,
-    std::unordered_map<std::string, std::vector<ir::Node *>> *delay_ops) const {
-  if (strategy_.reduce_ != BuildStrategy::ReduceStrategy::kReduce) {
-    return -1;
-  }
-
-  if (!OpHaveRole(*node, framework::OpRole::kOptimize)) {
-    return -1;
-  }
-
-  auto param_grad = boost::get<std::vector<std::string>>(
-      node->Op()->GetAttr(OpProtoAndCheckerMaker::OpRoleVarAttrName()));
-
-  PADDLE_ENFORCE_EQ(param_grad.size(), 2U);
-  int dev_id = GetVarDeviceID(param_grad[1], sharded_var_device);
-
-  if (dev_id == -1) {
-    (*delay_ops)[param_grad[1]].push_back(node);
-    return -2;
-  }
-  return dev_id;
-}
-
-int MultiDevSSAGraphBuilder::GetOpDeviceID(
-    ir::Node *node,
-    const std::unordered_map<std::string, int> &sharded_var_device) const {
-  if (strategy_.reduce_ != BuildStrategy::ReduceStrategy::kReduce) {
-    return -1;
-  }
-
-  if (!OpHaveRole(*node, framework::OpRole::kOptimize)) {
-    return -1;
-  }
-  auto param_grad = boost::get<std::vector<std::string>>(
-      node->Op()->GetAttr(OpProtoAndCheckerMaker::OpRoleVarAttrName()));
-
-  PADDLE_ENFORCE_EQ(param_grad.size(), 2U);
-  int dev_id = GetVarDeviceID(param_grad[1], sharded_var_device);
-  PADDLE_ENFORCE_NE(dev_id, -1, "dev_id should not be -1.[%s, %s, %s]",
-                    node->Op()->Type(), param_grad[0], param_grad[1]);
-  return dev_id;
-}
-
-int MultiDevSSAGraphBuilder::GetVarDeviceID(
-    const std::string &varname,
-    const std::unordered_map<std::string, int> &sharded_var_device) const {
-  auto got = sharded_var_device.find(varname);
-  if (got == sharded_var_device.end()) {
-    auto pos = varname.find(framework::kNewGradSuffix);
-    if (pos != std::string::npos) {
-      got = sharded_var_device.find(varname.substr(0, pos));
-    }
-  }
-  return got == sharded_var_device.end() ? -1 : got->second;
-}
-
-void MultiDevSSAGraphBuilder::CreateScaleLossGradOp(
->>>>>>> Hipify framework.
     ir::Graph *result, const std::string &loss_grad_name,
     ir::Node *out_var_node, size_t loss_scale,
     proto::VarType::Type dtype) const {
@@ -555,17 +452,10 @@ void MultiDevSSAGraphBuilderBase::CreateComputationalOps(
   }
 }
 
-<<<<<<< 475fb03da24f5161ba7bb12c0a659ebbed7b0a3c
 VarHandle *MultiDevSSAGraphBuilderBase::CreateReduceOp(ir::Graph *result,
                                                        const std::string &og,
                                                        int dst_dev_id) const {
-#if defined(PADDLE_WITH_CUDA) && !defined(_WIN32)
-=======
-VarHandle *MultiDevSSAGraphBuilder::CreateReduceOp(ir::Graph *result,
-                                                   const std::string &og,
-                                                   int dst_dev_id) const {
 #if (defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP)) && !defined(_WIN32)
->>>>>>> Hipify framework.
   result->Get<GraphOps>(kGraphOps).emplace_back(new ReduceOpHandle(
       result->CreateEmptyNode("reduce", ir::Node::Type::kOperation),
       local_scopes_, places_, nccl_ctxs_));
