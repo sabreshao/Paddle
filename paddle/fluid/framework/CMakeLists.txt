@@ -67,10 +67,6 @@ else()
 endif()
 cc_library(lod_tensor SRCS lod_tensor.cc DEPS ddim place tensor framework_proto recordio version)
 
-cc_library(proto_desc SRCS var_desc.cc op_desc.cc block_desc.cc program_desc.cc DEPS shape_inference op_info operator glog version)
-hip_test(program_desc_test SRCS program_desc_test.cc DEPS proto_desc
-device_context)
-
 cc_test(lod_tensor_test SRCS lod_tensor_test.cc DEPS lod_tensor memory)
 if(WITH_GPU)
   nv_test(lod_tensor_gpu_test SRCS lod_tensor_test.cu DEPS lod_tensor)
@@ -116,7 +112,7 @@ if(WITH_GPU)
   nv_test(data_type_transform_test SRCS data_type_transform_test.cc data_type_transform_test.cu DEPS data_type_transform)
 elseif(WITH_AMD_GPU)
   hip_library(data_type_transform SRCS data_type_transform.cu DEPS tensor)
-  hip_test(data_type_transform_test SRCS data_type_transform_test.cc data_type_transform_test.cu DEPS data_type_transform)
+  #hip_test(data_type_transform_test SRCS data_type_transform_test.cc data_type_transform_test.cu DEPS data_type_transform)
 else()
   cc_library(data_type_transform SRCS data_type_transform.cc DEPS tensor)
   cc_test(data_type_transform_test SRCS data_type_transform_test.cc DEPS data_type_transform)
@@ -129,6 +125,8 @@ cc_library(data_transform SRCS data_transform.cc DEPS math_function tensor
         framework_proto selected_rows data_device_transform data_type_transform data_layout_transform)
 
 cc_library(attribute SRCS attribute.cc DEPS framework_proto boost)
+#cc_test(program_desc_test SRCS program_desc_test.cc DEPS proto_desc
+#device_context)
 cc_library(op_proto_maker SRCS op_proto_maker.cc DEPS framework_proto attribute glog)
 cc_test(op_proto_maker_test SRCS op_proto_maker_test.cc DEPS op_proto_maker)
 cc_library(op_info SRCS op_info.cc DEPS attribute framework_proto)
@@ -144,8 +142,17 @@ cc_test(operator_test SRCS operator_test.cc DEPS operator op_registry device_con
 cc_library(version SRCS version.cc)
 cc_test(version_test SRCS version_test.cc DEPS version)
 
+cc_library(proto_desc SRCS var_desc.cc op_desc.cc block_desc.cc program_desc.cc DEPS shape_inference op_info operator glog version)
+
+if(WITH_NGRAPH)
+  cc_library(ngraph_bridge SRCS ngraph_bridge.cc DEPS operator framework_proto ngraph)
+  cc_library(ngraph_operator SRCS ngraph_operator.cc DEPS ngraph_bridge operator op_info device_context tensor scope glog
+             shape_inference data_transform lod_tensor profiler)
+endif(WITH_NGRAPH)
+
+
 cc_library(op_registry SRCS op_registry.cc DEPS op_proto_maker op_info operator glog proto_desc)
-hip_test(op_registry_test SRCS op_registry_test.cc DEPS op_registry)
+#hip_test(op_registry_test SRCS op_registry_test.cc DEPS op_registry)
 nv_test(op_registry_test SRCS op_registry_test.cc DEPS op_registry)
 
 py_proto_compile(framework_py_proto SRCS framework.proto data_feed.proto)
@@ -224,4 +231,3 @@ endif (NOT WIN32)
 
 cc_library(dlpack_tensor SRCS dlpack_tensor.cc DEPS tensor dlpack)
 cc_test(dlpack_tensor_test SRCS dlpack_tensor_test.cc DEPS dlpack_tensor glog)
-
