@@ -116,6 +116,36 @@ platform::TemporaryAllocator& DeviceTemporaryAllocator::Get(
 }
 #endif
 
+#ifdef PADDLE_WITH_HIP
+platform::TemporaryAllocator& DeviceTemporaryAllocator::Get(
+    const platform::Place& place, const hipStream_t& stream) {
+  PADDLE_ENFORCE(platform::is_gpu_place(place));
+  auto place_stream = std::make_pair(place, stream);
+  {
+    std::unique_lock<std::mutex> lock(mtx_);
+    if (!device_allocator_.count(place_stream)) {
+      device_allocator_[place_stream].reset(new TemporaryAllocator(place));
+      device_allocator_[place_stream]->SetCallback([stream]() {
+        PADDLE_ENFORCE(hipStreamSynchronize(stream));
+        PADDLE_ENFORCE(hipGetLastError());
+      });
+    }
+  }
+  return *device_allocator_.at(place_stream);
+}
+
+template <>
+platform::TemporaryAllocator& DeviceTemporaryAllocator::Get(
+    const platform::CUDADeviceContext& dev_ctx) {
+  auto place_stream = std::make_pair(dev_ctx.GetPlace(), dev_ctx.stream());
+  if (device_allocator_.count(place_stream)) {
+    return *device_allocator_.at(place_stream);
+  }
+  return Get(dev_ctx.GetPlace(), dev_ctx.stream());
+}
+#endif
+
+
 template <>
 platform::TemporaryAllocator& DeviceTemporaryAllocator::Get(
     const platform::CPUDeviceContext& dev_ctx) {
