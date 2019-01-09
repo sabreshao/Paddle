@@ -90,6 +90,10 @@ class DeviceTemporaryAllocator {
   platform::TemporaryAllocator& Get(const platform::Place& place,
                                     const cudaStream_t& stream);
 #endif
+#ifdef PADDLE_WITH_HIP
+  platform::TemporaryAllocator& Get(const platform::Place& place,
+                                    const hipStream_t& stream);
+#endif
   template <typename DeviceContext>
   platform::TemporaryAllocator& Get(const DeviceContext& dev_ctx);
 
@@ -107,7 +111,11 @@ class DeviceTemporaryAllocator {
            std::unique_ptr<platform::TemporaryAllocator>>
       device_allocator_;
 #endif
-
+#ifdef PADDLE_WITH_HIP
+  std::map<std::pair<platform::Place, hipStream_t>,
+           std::unique_ptr<platform::TemporaryAllocator>>
+      device_allocator_;
+#endif
   std::mutex mtx_;
 
   DISABLE_COPY_AND_ASSIGN(DeviceTemporaryAllocator);
