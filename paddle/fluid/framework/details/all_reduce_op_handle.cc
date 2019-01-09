@@ -111,8 +111,8 @@ void AllReduceOpHandle::RunImpl() {
             buffer, buffer, numel, static_cast<ncclDataType_t>(dtype), ncclSum,
             comm, stream));
       });
-    }
 #endif
+    }
 
     this->RunAndRecordEvent([&] {
       if (all_reduce_calls.size() == 1UL) {

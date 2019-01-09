@@ -92,7 +92,7 @@ class MultiDevSSAGraphBuilderBase : public ir::Pass {
   void CreateOpHandleIOs(ir::Graph *result, ir::Node *node,
                          size_t device_id) const;
 
-#if defined(PADDLE_WITH_CUDA) && !defined(_WIN32)
+#if (defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP)) && !defined(_WIN32)
   mutable platform::NCCLContextMap *nccl_ctxs_;
 #endif
 
