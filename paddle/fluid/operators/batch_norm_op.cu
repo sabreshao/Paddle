@@ -16,7 +16,13 @@ limitations under the License. */
 #include <cfloat>
 #include <string>
 #include <vector>
-#include "cub/cub.cuh"
+#if defined(PADDLE_WITH_CUDA)
+#include <cub/cub.cuh>
+namespace gpuprim = ::cub;
+#elif defined(PADDLE_WITH_HIP)
+#include <hipcub/hipcub.hpp>
+namespace gpuprim = ::hipcub;
+#endif
 #include "paddle/fluid/framework/data_layout.h"
 #include "paddle/fluid/operators/batch_norm_op.h"
 #include "paddle/fluid/operators/math/math_function.h"
@@ -215,7 +221,7 @@ static __global__ void KeBNBackwardScaleBias(
     BatchNormParamType<T> *dbias) {
   const int outer_size = C;
   const int inner_size = N * HxW;
-  typedef cub::BlockReduce<BatchNormParamType<T>, BlockDim> BlockReduce;
+  typedef gpuprim::BlockReduce<BatchNormParamType<T>, BlockDim> BlockReduce;
   __shared__ typename BlockReduce::TempStorage ds_storage;
   __shared__ typename BlockReduce::TempStorage db_storage;
 
@@ -233,8 +239,8 @@ static __global__ void KeBNBackwardScaleBias(
                 (static_cast<BatchNormParamType<T>>(x[index]) - mean_i);
       db_sum += static_cast<BatchNormParamType<T>>(dy[index]);
     }
-    ds_sum = BlockReduce(ds_storage).Reduce(ds_sum, cub::Sum());
-    db_sum = BlockReduce(db_storage).Reduce(db_sum, cub::Sum());
+    ds_sum = BlockReduce(ds_storage).Reduce(ds_sum, gpuprim::Sum());
+    db_sum = BlockReduce(db_storage).Reduce(db_sum, gpuprim::Sum());
     if (threadIdx.x == 0) {
       dscale[i] = ds_sum * inv_var_i;
       dbias[i] = db_sum;
@@ -361,28 +367,28 @@ class BatchNormGradKernel<platform::CUDADeviceContext, T>
 
       if (data_layout == framework::DataLayout::kNCHW) {
         if (d_x) {
-          KeBNBackwardData<T, framework::DataLayout::kNCHW><<<
-              grid1, block, 0, dev_ctx.stream()>>>(
+          hipLaunchKernelGGL(KeBNBackwardData<T, framework::DataLayout::kNCHW>,
+              grid1, block, 0, dev_ctx.stream(),
               d_y->data<T>(), scale->data<BatchNormParamType<T>>(),
               running_var_data, epsilon, C, H * W, num, d_x->data<T>());
         }
         if (d_scale && d_bias) {
-          KeBNBackwardScaleBias<T, block, framework::DataLayout::kNCHW><<<
-              grid2, block, 0, dev_ctx.stream()>>>(
+          hipLaunchKernelGGL(KeBNBackwardScaleBias<T, block, framework::DataLayout::kNCHW>,
+              grid2, block, 0, dev_ctx.stream(),
               d_y->data<T>(), x->data<T>(), running_mean_data, running_var_data,
               epsilon, C, H * W, num, d_scale->data<BatchNormParamType<T>>(),
               d_bias->data<BatchNormParamType<T>>());
         }
       } else {
         if (d_x) {
-          KeBNBackwardData<T, framework::DataLayout::kNHWC><<<
-              grid1, block, 0, dev_ctx.stream()>>>(
+          hipLaunchKernelGGL(KeBNBackwardData<T, framework::DataLayout::kNHWC>,
+              grid1, block, 0, dev_ctx.stream(),
               d_y->data<T>(), scale->data<BatchNormParamType<T>>(),
               running_var_data, epsilon, C, H * W, num, d_x->data<T>());
         }
         if (d_scale && d_bias) {
-          KeBNBackwardScaleBias<T, block, framework::DataLayout::kNCHW><<<
-              grid2, block, 0, dev_ctx.stream()>>>(
+          hipLaunchKernelGGL(KeBNBackwardScaleBias<T, block, framework::DataLayout::kNCHW>,
+              grid2, block, 0, dev_ctx.stream(),
               d_y->data<T>(), x->data<T>(), running_mean_data, running_var_data,
               epsilon, C, H * W, num, d_scale->data<BatchNormParamType<T>>(),
               d_bias->data<BatchNormParamType<T>>());
