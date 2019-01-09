@@ -40,7 +40,11 @@ struct SigmoidCrossEntropyWithLogitsForward {
     }
     T term1 = (x > 0) ? x : 0;
     T term2 = x * label;
+#ifdef __HIP_DEVICE_COMPILE__
+    T term3 = logf(static_cast<T>(1) + expf(-(abs(x))));
+#else
     T term3 = std::log(static_cast<T>(1) + std::exp(-(std::abs(x))));
+#endif
     return term1 - term2 + term3;
   }
 
@@ -56,7 +60,11 @@ struct SigmoidCrossEntropyWithLogitsBackward {
     if (static_cast<int>(label) == ignore_index) {
       return static_cast<T>(0.);
     }
+#ifdef __HIP_DEVICE_COMPILE__
+    T simoid_x = static_cast<T>(1) / (static_cast<T>(1) + expf(-x));
+#else
     T simoid_x = static_cast<T>(1) / (static_cast<T>(1) + std::exp(-x));
+#endif
     return simoid_x - label;
   }
 
