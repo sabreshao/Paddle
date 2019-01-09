@@ -12,6 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
+#ifdef PADDLE_WITH_PADDLE
 #include "paddle/fluid/framework/op_registry.h"
 #include "paddle/fluid/operators/cudnn_rnn_cache.h"
 #include "paddle/fluid/operators/math/math_function.h"
@@ -259,3 +260,4 @@ class CudnnLSTMGPUGradKernel : public framework::OpKernel<T> {
 namespace ops = paddle::operators;
 REGISTER_OP_CUDA_KERNEL(cudnn_lstm, ops::CudnnLSTMGPUKernel<float>);
 REGISTER_OP_CUDA_KERNEL(cudnn_lstm_grad, ops::CudnnLSTMGPUGradKernel<float>);
+#endif
