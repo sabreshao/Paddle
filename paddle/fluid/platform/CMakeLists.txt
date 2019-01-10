@@ -84,6 +84,7 @@ if(WIN32)
 endif(WIN32)
 
 nv_test(device_context_test SRCS device_context_test.cu DEPS device_context gpu_info)
+hip_test(device_context_test SRCS device_context_test.cu DEPS device_context gpu_info)
 
 cc_test(init_test SRCS init_test.cc DEPS device_context)
 
