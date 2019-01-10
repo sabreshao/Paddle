@@ -38,11 +38,11 @@ __inline__ __device__ T warpReduceSum(T val) {
 #ifdef PADDLE_WITH_HIP
 // Fix ME.
 __forceinline__ __device__ unsigned lane_id() {
-  return 0;
+  return __lane_id();
 }
 
 __forceinline__ __device__ unsigned warp_id() {
-  return 0;
+  return __lane_id();
 }
 #else
 __forceinline__ __device__ unsigned lane_id() {
@@ -359,7 +359,7 @@ __device__ __inline__ void KernelDepthwiseConvFilterGrad(
   T s = 0;
 
   int gbid = ((blockIdx.z * gridDim.y) + blockIdx.y) * gridDim.x + blockIdx.x;
-  int lid = 0;//lane_id();
+  int lid = lane_id();
 
   for (int image_w = threadIdx.x; image_w < output_width;
        image_w += blockDim.x) {
