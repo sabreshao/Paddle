@@ -52,6 +52,7 @@ limitations under the License. */
     if (!(e)) {                                                    \
       printf("%s:%d Assertion `%s` failed.\n", __FILE__, __LINE__, \
              TOSTRING(e));                                         \
+      __assert_fail(NULL, __FILE__, __LINE__, NULL);               \
     }                                                              \
   } while (0)
 
@@ -60,6 +61,7 @@ limitations under the License. */
     if (!(e)) {                                                         \
       printf("%s:%d Assertion `%s` failed (%s).\n", __FILE__, __LINE__, \
              TOSTRING(e), m);                                           \
+      __assert_fail(NULL, __FILE__, __LINE__, NULL);                    \
     }                                                                   \
   } while (0)
 
@@ -68,6 +70,7 @@ limitations under the License. */
     if (!(e)) {                                                            \
       printf("%s:%d Assertion `%s` failed (%s %d).\n", __FILE__, __LINE__, \
              TOSTRING(e), m, c);                                           \
+      __assert_fail(NULL, __FILE__, __LINE__, NULL);                \
     }                                                                      \
  } while (0)
 #else
