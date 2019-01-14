@@ -494,8 +494,7 @@ CUDADeviceContext::CUDADeviceContext(CUDAPlace place)
   eigen_stream_.reset(new EigenHipStreamDevice());
   eigen_stream_->Reinitialize(&stream_, place);
   eigen_device_.reset(new Eigen::GpuDevice(eigen_stream_.get()));
-  PADDLE_ENFORCE(dynload::hipblasCreate(&hipblas_handle_));
-  PADDLE_ENFORCE(dynload::hipblasSetStream(hipblas_handle_, stream_));
+  hipblas_handle_.reset(new HipblasHandleHolder(stream_));
   if (dynload::HasMIOpen()) {
     miopen_holder_.reset(new MiopenHolder(&stream_, place));
   }
@@ -504,7 +503,7 @@ CUDADeviceContext::CUDADeviceContext(CUDAPlace place)
 CUDADeviceContext::~CUDADeviceContext() {
   SetDeviceId(place_.device);
   Wait();
-  PADDLE_ENFORCE(dynload::hipblasDestroy(hipblas_handle_));
+  hipblas_handle_.reset();
 
   eigen_stream_.reset();
   eigen_device_.reset();
@@ -529,10 +528,6 @@ int CUDADeviceContext::GetMaxPhysicalThreadCount() const {
 
 Eigen::GpuDevice* CUDADeviceContext::eigen_device() const {
   return eigen_device_.get();
-}
-
-hipblasHandle_t CUDADeviceContext::hipblas_handle() const {
-  return hipblas_handle_;
 }
 
 miopenHandle_t CUDADeviceContext::miopen_handle() const {

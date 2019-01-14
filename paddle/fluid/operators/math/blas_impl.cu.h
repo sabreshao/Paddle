@@ -62,7 +62,6 @@ struct CUBlas<float> {
 // Because the gcc 4.8 doesn't expand template parameter pack that
 // appears in a lambda-expression, I can not use template parameter pack
 // here.
-    auto cublas_call = [&]() {
 #if CUDA_VERSION >= 8000
     VLOG(5) << "use_tensor_op_math: "
             << (dev_ctx->tensor_core_available() ? "True" : "False");
@@ -177,7 +176,7 @@ struct CUBlas<platform::float16> {
     PADDLE_THROW("cublasGemmEx is supported on cuda >= 8.0");
 #endif
   }
-}cudaDataType_t;
+};
 #endif
 
 template <>
@@ -203,10 +202,17 @@ void Blas<platform::CUDADeviceContext>::GEMM(CBLAS_TRANSPOSE transA,
                        CUDA_R_32F, N);
   } else {
 #endif  // CUDA_VERSION >= 8000
+#ifdef PADDLE_WITH_HIP
+    context_.HipblasCall([&](hipblasHandle_t handle) {
+      CUBlas<T>::GEMM(handle, cuTransB, cuTransA, N, M, K, &alpha, B, ldb, A,
+                      lda, &beta, C, N);
+    });
+#else
     context_.CublasCall([&](cublasHandle_t handle) {
       CUBlas<T>::GEMM(handle, cuTransB, cuTransA, N, M, K, &alpha, B, ldb, A,
                       lda, &beta, C, N);
     });
+#endif
 
 #if CUDA_VERSION >= 8000
   }
@@ -277,11 +283,17 @@ void Blas<platform::CUDADeviceContext>::GEMM(bool transA, bool transB, int M,
                        CUDA_R_32F, ldc);
   } else {
 #endif  // CUDA_VERSION >= 8000
-
+#ifdef PADDLE_WITH_HIP
+    context_.HipblasCall([&](hipblasHandle_t handle) {
+      CUBlas<T>::GEMM(handle, cuTransB, cuTransA, N, M, K, &alpha, B, ldb, A,
+                      lda, &beta, C, ldc);
+    });
+#else
     context_.CublasCall([&](cublasHandle_t handle) {
       CUBlas<T>::GEMM(handle, cuTransB, cuTransA, N, M, K, &alpha, B, ldb, A,
                       lda, &beta, C, ldc);
     });
+#endif
 
 #if CUDA_VERSION >= 8000
   }
@@ -311,7 +323,7 @@ template <>
 template <typename T>
 void Blas<platform::CUDADeviceContext>::AXPY(int n, T alpha, const T *x,
                                              T *y) const {
-  context_.CublasCall([&](cublasHandle_t handle) {
+  context_.HipblasCall([&](hipblasHandle_t handle) {
     CUBlas<T>::AXPY(handle, n, &alpha, x, 1, y, 1);
   });
 }
@@ -323,7 +335,7 @@ void Blas<platform::CUDADeviceContext>::GEMV(bool trans_a, int M, int N,
                                              T beta, T *C) const {
   hipblasOperation_t cuTransA = !trans_a ? HIPBLAS_OP_T : HIPBLAS_OP_N;
 
-  context_.CublasCall([&](cublasHandle_t handle) {
+  context_.HipblasCall([&](hipblasHandle_t handle) {
     CUBlas<T>::GEMV(handle, cuTransA, N, M, &alpha, A, N, B, 1, &beta, C, 1);
   });
 }
@@ -364,11 +376,19 @@ void Blas<platform::CUDADeviceContext>::BatchedGEMM(
   } else {
 #endif  // CUDA_VERSION >= 9010
 
+#ifdef PADDLE_WITH_HIP
+    context_.HipblasCall([&](hipblasHandle_t handle) {
+      CUBlas<T>::GEMM_STRIDED_BATCH(handle, cuTransB, cuTransA, N, M, K, &alpha,
+                                    B, ldb, strideB, A, lda, strideA, &beta, C,
+                                    ldc, strideC, batchCount);
+    });
+#else
     context_.CublasCall([&](cublasHandle_t handle) {
       CUBlas<T>::GEMM_STRIDED_BATCH(handle, cuTransB, cuTransA, N, M, K, &alpha,
                                     B, ldb, strideB, A, lda, strideA, &beta, C,
                                     ldc, strideC, batchCount);
     });
+#endif
 
 #if CUDA_VERSION >= 9010
   }

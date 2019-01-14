@@ -16,7 +16,11 @@
 
 #include <mutex>  // NOLINT
 
+#ifdef PADDLE_WITH_HIP
+#include "paddle/fluid/platform/dynload/hipblas.h"
+#else
 #include "paddle/fluid/platform/dynload/cublas.h"
+#endif
 #include "paddle/fluid/platform/macros.h"
 
 #if CUDA_VERSION < 9000
@@ -26,6 +30,7 @@ enum cublasMath_t { CUBLAS_DEFAULT_MATH = 0 };
 namespace paddle {
 namespace platform {
 
+#ifdef PADDLE_WITH_CUDA
 class CublasHandleHolder {
  public:
   CublasHandleHolder(cudaStream_t stream, cublasMath_t math_type) {
@@ -53,6 +58,32 @@ class CublasHandleHolder {
   cublasHandle_t handle_;
   mutable std::mutex mtx_;
 };
+#endif
+
+#ifdef PADDLE_WITH_HIP
+class HipblasHandleHolder {
+public:
+ HipblasHandleHolder(hipStream_t stream) {
+   PADDLE_ENFORCE(dynload::hipblasCreate(&handle_));
+   PADDLE_ENFORCE(dynload::hipblasSetStream(handle_, stream));
+ }
+
+ ~HipblasHandleHolder() { PADDLE_ENFORCE(dynload::hipblasDestroy(handle_)); }
+
+ template <typename Callback>
+ inline void Call(Callback &&callback) const {
+   std::lock_guard<std::mutex> guard(mtx_);
+   callback(handle_);
+ }
+
+private:
+ DISABLE_COPY_AND_ASSIGN(HipblasHandleHolder);
+
+ hipblasHandle_t handle_;
+ mutable std::mutex mtx_;
+};
+
+#endif
 
 }  // namespace platform
 }  // namespace paddle

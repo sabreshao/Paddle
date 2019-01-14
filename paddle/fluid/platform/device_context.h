@@ -27,6 +27,7 @@ limitations under the License. */
 #endif
 
 #ifdef PADDLE_WITH_HIP
+#include "paddle/fluid/platform/cuda_helper.h"
 #include "paddle/fluid/platform/dynload/hipblas.h"
 #include "paddle/fluid/platform/dynload/miopen.h"
 #include "paddle/fluid/platform/gpu_info.h"
@@ -434,8 +435,12 @@ class CUDADeviceContext : public DeviceContext {
   /*! \brief  Return eigen device in the device context. */
   Eigen::GpuDevice* eigen_device() const;
 
-  /*! \brief  Return hipblas handle in the device context. */
-  hipblasHandle_t hipblas_handle() const;
+  
+  /*! \brief  Call hipblas function safely. */
+  template <typename Callback>
+  inline void HipblasCall(Callback&& callback) const {
+    hipblas_handle_->Call(std::forward<Callback>(callback));
+  }
 
   /*! \brief  Return miopen handle in the device context. */
   miopenHandle_t miopen_handle() const;
@@ -473,7 +478,7 @@ class CUDADeviceContext : public DeviceContext {
   mutable std::recursive_mutex mutex_;
   hipStream_t stream_;
   miopenHandle_t miopen_handle_;
-  hipblasHandle_t hipblas_handle_;
+  std::unique_ptr<HipblasHandleHolder> hipblas_handle_;
   int compute_capability;
   int multi_process;
   int max_threads_per_mp;
